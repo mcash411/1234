@@ -120,6 +120,7 @@
                                 <option value="EAN8" selected>EAN-8</option>
                                 <option value="EAN13">EAN-13</option>
                                 <option value="CODE128">CODE128</option>
+                                <option value="CODE39">CODE39</option>
                             </select>
                         </div>
 
@@ -288,6 +289,7 @@
                                 <option value="EAN8">EAN-8</option>
                                 <option value="EAN13">EAN-13</option>
                                 <option value="CODE128">CODE128</option>
+                                <option value="CODE39">CODE39</option>
                             </select>
                         </div>
 
@@ -489,9 +491,9 @@
         function fillSampleData() {
             const type = document.getElementById('selectType').value;
             if(type === 'goods') {
-                document.getElementById('uniField0').value = "4710088432109";
-                setBarcodeFormat('EAN13');
-                document.getElementById('selectBarcodeFormat').value = 'EAN13';
+                document.getElementById('uniField0').value = "ABC-12345";
+                setBarcodeFormat('CODE39');
+                document.getElementById('selectBarcodeFormat').value = 'CODE39';
             } else if(type === 'utility') {
                 document.getElementById('uniField0').value = "131201788";
                 document.getElementById('uniField1').value = "9524294830000049";
@@ -689,7 +691,7 @@
         }
 
         function fillBatchSample() {
-            document.getElementById('batchTextArea').value = "20719128, 2, 鮮乳特價\n4710088432109, 1, 燕麥奶\n131201788 9524294830000049, 1, 水電費帳單";
+            document.getElementById('batchTextArea').value = "20719128, 2, 鮮乳特價\nABC-12345, 1, 倉庫貨號(Code39)\n131201788 9524294830000049, 1, 水電費帳單";
             generateBatchBarcodes();
         }
 
