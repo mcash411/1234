@@ -18,7 +18,7 @@
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
     <!-- QRCode.js -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-    <!-- html5-qrcode (修復版 CDN) -->
+    <!-- html5-qrcode -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.4/html5-qrcode.min.js"></script>
 
     <style>
@@ -49,7 +49,7 @@
                 </div>
                 <div>
                     <h1 class="font-bold text-base md:text-lg leading-tight text-slate-900">7-ELEVEN POS Web App</h1>
-                    <p class="text-[11px] text-slate-500">相機掃描 / 智慧條碼解析 / 兌換券生成器</p>
+                    <p class="text-[11px] text-slate-500">相機掃描 / 智慧條碼自動辨識 / 兌換券生成器</p>
                 </div>
             </div>
             <div class="flex items-center space-x-2">
@@ -67,7 +67,7 @@
             <div class="bg-slate-900 text-white px-5 py-4 flex items-center justify-between">
                 <div class="flex items-center space-x-2.5">
                     <span class="w-3 h-3 rounded-full bg-emerald-400 animate-pulse"></span>
-                    <span class="font-bold text-sm tracking-wide">POS 條碼與智慧辨識設定 (已修復)</span>
+                    <span class="font-bold text-sm tracking-wide">POS 條碼與智慧自動辨識設定</span>
                 </div>
                 <div class="flex items-center space-x-2">
                     <span class="text-xs bg-slate-800 text-emerald-400 px-2.5 py-1 rounded-lg font-mono font-bold border border-slate-700" id="typeBadge">商品條碼</span>
@@ -79,7 +79,7 @@
                     <div class="flex justify-between items-center text-xs font-bold text-slate-700 border-b border-slate-200 pb-2">
                         <span class="flex items-center space-x-1.5">
                             <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path></svg>
-                            <span>智慧辨識與相機掃描</span>
+                            <span>智慧條碼自動辨識與相機掃描</span>
                         </span>
                         <div class="flex items-center space-x-2">
                             <button onclick="toggleScanner()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center space-x-1 shadow-xs">
@@ -101,8 +101,8 @@
 
                     <div class="grid grid-cols-1 sm:grid-cols-12 gap-3">
                         <div class="sm:col-span-12">
-                            <label class="block text-[11px] font-semibold text-slate-500 mb-1">智慧萬能輸入框</label>
-                            <input type="text" id="inputUniversal" value="20719128" placeholder="掃描或輸入條碼內容..." oninput="handleUniversalInput()" autofocus
+                            <label class="block text-[11px] font-semibold text-slate-500 mb-1">智慧萬能輸入框 (自動辨識類型)</label>
+                            <input type="text" id="inputUniversal" value="20719128" placeholder="請掃描條碼或直接貼上多段繳費代碼..." oninput="handleUniversalInput()" autofocus
                                 class="w-full px-3 py-2.5 bg-white border border-emerald-300 rounded-lg text-xs font-mono font-bold text-slate-800 focus:ring-2 focus:ring-emerald-500 outline-none shadow-xs">
                         </div>
 
@@ -208,7 +208,7 @@
                 <div class="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 border-t border-slate-100 text-xs text-slate-500">
                     <div class="flex items-center space-x-2">
                         <svg class="w-4 h-4 text-emerald-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                        <span>相機與辨識機制已全面校正，支援連續掃描與穩定渲染。</span>
+                        <span>智慧自動辨識模組已強化，能自動根據輸入長度與區段切換條碼規格。</span>
                     </div>
                     <div class="font-mono text-[11px] bg-slate-100 text-slate-600 px-2.5 py-1 rounded-lg shrink-0">
                         Status: <span id="statusText" class="text-emerald-600 font-bold">Ready</span>
@@ -265,10 +265,9 @@
                 html5QrCode.start(
                     { facingMode: "environment" },
                     { fps: 10, qrbox: { width: 250, height: 150 } },
-                    (decodedText, decodedResult) => {
+                    (decodedText) => {
                         document.getElementById('inputUniversal').value = decodedText;
                         handleUniversalInput();
-                        // 掃描成功後自動關閉鏡頭
                         if (html5QrCode && html5QrCode.isScanning) {
                             html5QrCode.stop().then(() => {
                                 isScanning = false;
@@ -281,9 +280,7 @@
                             btnText.textContent = "開啟相機掃描";
                         }
                     },
-                    (errorMessage) => {
-                        // 略過未偵測到條碼時的日常錯誤回報
-                    }
+                    () => {}
                 ).then(() => {
                     isScanning = true;
                     btnText.textContent = "關閉相機";
@@ -313,7 +310,8 @@
             let raw = document.getElementById('inputUniversal').value.trim();
             if (!raw) raw = "0";
 
-            const parts = raw.split(/[\s,\t]+/);
+            // 改進的智慧字串切分：依據空白或特定分隔符號拆解
+            const parts = raw.split(/[\s,\t|]+/);
 
             if (parts.length >= 3 || (parts.length === 2 && parts[0].length >= 7 && parts[1].length >= 10)) {
                 currentType = 'utility';
@@ -321,7 +319,7 @@
                 document.getElementById('inputCode1').value = parts[0] || '';
                 document.getElementById('inputCode2').value = parts[1] || '';
                 document.getElementById('inputCode3').value = parts[2] || '';
-            } else if (parts.length === 2 && parts[0].length >= 15) {
+            } else if (parts.length === 2 && parts[0].length >= 12) {
                 currentType = 'egtc';
                 document.getElementById('selectType').value = 'egtc';
                 document.getElementById('inputEgtcBarcode1').value = parts[0];
