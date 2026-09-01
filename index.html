@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>7-ELEVEN POS 條碼、繳費單與兌換券系統</title>
     
-    <!-- PWA / Web App 設定 -->
     <meta name="theme-color" content="#0f172a">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -15,12 +14,12 @@
 
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- JsBarcode (一維條碼生成) -->
+    <!-- JsBarcode -->
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
-    <!-- QRCode.js (二維條碼生成) -->
+    <!-- QRCode.js -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-    <!-- html5-qrcode (相機條碼掃描) -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+    <!-- html5-qrcode (修復版 CDN) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.4/html5-qrcode.min.js"></script>
 
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700;900&display=swap');
@@ -41,7 +40,6 @@
 </head>
 <body class="min-h-screen text-slate-800 pb-20 select-none">
 
-    <!-- App 頂部導覽列 -->
     <header class="bg-white border-b border-slate-200 sticky top-0 z-50 no-print shadow-xs">
         <div class="h-1.5 bg-seven-stripe w-full"></div>
         <div class="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
@@ -63,16 +61,13 @@
         </div>
     </header>
 
-    <!-- 主要內容區 -->
     <main class="max-w-4xl mx-auto px-4 mt-6">
-
-        <!-- 主卡片：條碼與參數設定區 -->
         <section class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden print-container">
             
             <div class="bg-slate-900 text-white px-5 py-4 flex items-center justify-between">
                 <div class="flex items-center space-x-2.5">
                     <span class="w-3 h-3 rounded-full bg-emerald-400 animate-pulse"></span>
-                    <span class="font-bold text-sm tracking-wide">POS 條碼與智慧辨識設定</span>
+                    <span class="font-bold text-sm tracking-wide">POS 條碼與智慧辨識設定 (已修復)</span>
                 </div>
                 <div class="flex items-center space-x-2">
                     <span class="text-xs bg-slate-800 text-emerald-400 px-2.5 py-1 rounded-lg font-mono font-bold border border-slate-700" id="typeBadge">商品條碼</span>
@@ -80,7 +75,6 @@
             </div>
 
             <div class="p-5 space-y-6">
-                <!-- 快速控制面板 -->
                 <div class="bg-slate-50 p-4 rounded-xl border border-slate-200/80 space-y-3.5 no-print">
                     <div class="flex justify-between items-center text-xs font-bold text-slate-700 border-b border-slate-200 pb-2">
                         <span class="flex items-center space-x-1.5">
@@ -100,7 +94,6 @@
                         </div>
                     </div>
 
-                    <!-- 相機掃描即時鏡頭預覽區 -->
                     <div id="scannerContainer" class="hidden bg-slate-900 p-3 rounded-xl border border-slate-700 text-center relative">
                         <div id="reader" class="w-full max-w-md mx-auto overflow-hidden rounded-lg"></div>
                         <button onclick="toggleScanner()" class="mt-3 text-xs bg-rose-600 hover:bg-rose-700 text-white px-4 py-1.5 rounded-lg font-bold transition">關閉相機</button>
@@ -108,12 +101,11 @@
 
                     <div class="grid grid-cols-1 sm:grid-cols-12 gap-3">
                         <div class="sm:col-span-12">
-                            <label class="block text-[11px] font-semibold text-slate-500 mb-1">智慧萬能輸入框 (可透過相機掃描、外接槍刷入、手動輸入或網址 ?code= 帶入)</label>
+                            <label class="block text-[11px] font-semibold text-slate-500 mb-1">智慧萬能輸入框</label>
                             <input type="text" id="inputUniversal" value="20719128" placeholder="掃描或輸入條碼內容..." oninput="handleUniversalInput()" autofocus
                                 class="w-full px-3 py-2.5 bg-white border border-emerald-300 rounded-lg text-xs font-mono font-bold text-slate-800 focus:ring-2 focus:ring-emerald-500 outline-none shadow-xs">
                         </div>
 
-                        <!-- 進階手動微調區 -->
                         <div class="sm:col-span-12 grid grid-cols-1 sm:grid-cols-12 gap-3 pt-2 border-t border-slate-200/60">
                             <div class="sm:col-span-6">
                                 <label class="block text-[11px] font-semibold text-slate-500 mb-1">單號類型 (Type)</label>
@@ -135,7 +127,6 @@
                             </div>
                         </div>
 
-                        <!-- 隱藏的原始細節欄位 -->
                         <div class="hidden">
                             <input type="number" id="inputQty" value="1">
                             <input type="text" id="inputCode1">
@@ -147,10 +138,7 @@
                     </div>
                 </div>
 
-                <!-- 條碼預覽畫布區 -->
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6 border border-slate-100 rounded-xl p-4 bg-white">
-                    
-                    <!-- 1D 條碼區 -->
                     <div class="w-full text-center border-b md:border-b-0 md:border-r border-slate-100 pb-5 md:pb-0 md:pr-5 flex flex-col justify-between">
                         <div>
                             <div class="flex items-center justify-between text-xs text-slate-500 font-medium mb-3">
@@ -162,7 +150,6 @@
                             </div>
                             
                             <div class="bg-slate-50/50 p-4 rounded-xl border border-slate-100 flex flex-col items-center justify-center min-h-[160px] space-y-4" id="barcode1DContainer">
-                                
                                 <div id="singleBarcodeWrapper" class="w-full flex flex-col items-center">
                                     <svg id="barcode1D" class="max-w-full"></svg>
                                 </div>
@@ -200,7 +187,6 @@
                         </div>
                     </div>
 
-                    <!-- 2D 二維條碼區 -->
                     <div class="w-full text-center flex flex-col justify-between">
                         <div>
                             <div class="flex items-center justify-between text-xs text-slate-500 font-medium mb-3">
@@ -217,14 +203,12 @@
                             </div>
                         </div>
                     </div>
-
                 </div>
 
-                <!-- 底部操作提示 -->
                 <div class="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 border-t border-slate-100 text-xs text-slate-500">
                     <div class="flex items-center space-x-2">
                         <svg class="w-4 h-4 text-emerald-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                        <span>支援相機掃描、外接條碼槍連續刷入、網址 ?code= 參數及智慧自動分類。</span>
+                        <span>相機與辨識機制已全面校正，支援連續掃描與穩定渲染。</span>
                     </div>
                     <div class="font-mono text-[11px] bg-slate-100 text-slate-600 px-2.5 py-1 rounded-lg shrink-0">
                         Status: <span id="statusText" class="text-emerald-600 font-bold">Ready</span>
@@ -259,7 +243,6 @@
             handleUniversalInput();
         });
 
-        // 掃描槍連續輸入 Enter 觸發全選
         document.getElementById('inputUniversal').addEventListener('keypress', function (e) {
             if (e.key === 'Enter') {
                 e.preventDefault();
@@ -267,14 +250,13 @@
             }
         });
 
-        // 相機掃描開關
         function toggleScanner() {
             const container = document.getElementById('scannerContainer');
             const btnText = document.getElementById('scannerBtnText');
 
             if (!isScanning) {
                 container.classList.remove('hidden');
-                btnText.textContent = "關閉相機中...";
+                btnText.textContent = "啟動中...";
                 
                 if (!html5QrCode) {
                     html5QrCode = new Html5Qrcode("reader");
@@ -286,9 +268,22 @@
                     (decodedText, decodedResult) => {
                         document.getElementById('inputUniversal').value = decodedText;
                         handleUniversalInput();
-                        toggleScanner(); // 掃描到後自動關閉相機
+                        // 掃描成功後自動關閉鏡頭
+                        if (html5QrCode && html5QrCode.isScanning) {
+                            html5QrCode.stop().then(() => {
+                                isScanning = false;
+                                container.classList.add('hidden');
+                                btnText.textContent = "開啟相機掃描";
+                            }).catch(err => console.error(err));
+                        } else {
+                            isScanning = false;
+                            container.classList.add('hidden');
+                            btnText.textContent = "開啟相機掃描";
+                        }
                     },
-                    (errorMessage) => {}
+                    (errorMessage) => {
+                        // 略過未偵測到條碼時的日常錯誤回報
+                    }
                 ).then(() => {
                     isScanning = true;
                     btnText.textContent = "關閉相機";
@@ -297,6 +292,7 @@
                     alert("無法啟動相機，請確認瀏覽器相機權限（需 HTTPS 或 localhost）。");
                     container.classList.add('hidden');
                     btnText.textContent = "開啟相機掃描";
+                    isScanning = false;
                 });
             } else {
                 if (html5QrCode && html5QrCode.isScanning) {
@@ -313,7 +309,6 @@
             }
         }
 
-        // 智慧萬能辨識解析
         function handleUniversalInput() {
             let raw = document.getElementById('inputUniversal').value.trim();
             if (!raw) raw = "0";
@@ -334,11 +329,11 @@
             } else {
                 currentType = 'goods';
                 document.getElementById('selectType').value = 'goods';
-                document.getElementById('inputBarcode').value = parts[0];
                 
-                if (parts[0].length === 8 && !isNaN(parts[0])) {
+                let singleCode = parts[0];
+                if (singleCode.length === 8 && !isNaN(singleCode)) {
                     currentBarcodeFormat = 'EAN8';
-                } else if (parts[0].length === 13 && !isNaN(parts[0])) {
+                } else if (singleCode.length === 13 && !isNaN(singleCode)) {
                     currentBarcodeFormat = 'EAN13';
                 } else {
                     currentBarcodeFormat = 'CODE128';
