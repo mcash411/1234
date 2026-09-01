@@ -49,7 +49,7 @@
                 </div>
                 <div>
                     <h1 class="font-bold text-base md:text-lg leading-tight text-slate-900">7-ELEVEN POS Web App</h1>
-                    <p class="text-[11px] text-slate-500">相機掃描 / 智慧條碼自動辨識 / 兌換券生成器</p>
+                    <p class="text-[11px] text-slate-500">相機掃描 / 條碼辨識修復版 / 兌換券生成器</p>
                 </div>
             </div>
             <div class="flex items-center space-x-2">
@@ -67,7 +67,7 @@
             <div class="bg-slate-900 text-white px-5 py-4 flex items-center justify-between">
                 <div class="flex items-center space-x-2.5">
                     <span class="w-3 h-3 rounded-full bg-emerald-400 animate-pulse"></span>
-                    <span class="font-bold text-sm tracking-wide">POS 條碼與智慧自動辨識設定</span>
+                    <span class="font-bold text-sm tracking-wide">POS 條碼與智慧辨識設定</span>
                 </div>
                 <div class="flex items-center space-x-2">
                     <span class="text-xs bg-slate-800 text-emerald-400 px-2.5 py-1 rounded-lg font-mono font-bold border border-slate-700" id="typeBadge">商品條碼</span>
@@ -102,7 +102,7 @@
                     <div class="grid grid-cols-1 sm:grid-cols-12 gap-3">
                         <div class="sm:col-span-12">
                             <label class="block text-[11px] font-semibold text-slate-500 mb-1">智慧萬能輸入框 (自動辨識類型)</label>
-                            <input type="text" id="inputUniversal" value="20719128" placeholder="請掃描條碼或直接貼上多段繳費代碼..." oninput="handleUniversalInput()" autofocus
+                            <input type="text" id="inputUniversal" value="20719128" placeholder="請掃描條碼或直接輸入多段代碼..." oninput="handleUniversalInput()" autofocus
                                 class="w-full px-3 py-2.5 bg-white border border-emerald-300 rounded-lg text-xs font-mono font-bold text-slate-800 focus:ring-2 focus:ring-emerald-500 outline-none shadow-xs">
                         </div>
 
@@ -208,7 +208,7 @@
                 <div class="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 border-t border-slate-100 text-xs text-slate-500">
                     <div class="flex items-center space-x-2">
                         <svg class="w-4 h-4 text-emerald-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                        <span>智慧自動辨識模組已強化，能自動根據輸入長度與區段切換條碼規格。</span>
+                        <span>條碼自動辨識引擎已修正，支援智慧空白與多分隔符號解析。</span>
                     </div>
                     <div class="font-mono text-[11px] bg-slate-100 text-slate-600 px-2.5 py-1 rounded-lg shrink-0">
                         Status: <span id="statusText" class="text-emerald-600 font-bold">Ready</span>
@@ -310,8 +310,8 @@
             let raw = document.getElementById('inputUniversal').value.trim();
             if (!raw) raw = "0";
 
-            // 改進的智慧字串切分：依據空白或特定分隔符號拆解
-            const parts = raw.split(/[\s,\t|]+/);
+            // 全面強化的智慧切分邏輯，支援空格、Tab、逗號與 | 符號
+            const parts = raw.split(/[\s,\t|]+/).filter(p => p.length > 0);
 
             if (parts.length >= 3 || (parts.length === 2 && parts[0].length >= 7 && parts[1].length >= 10)) {
                 currentType = 'utility';
@@ -328,7 +328,7 @@
                 currentType = 'goods';
                 document.getElementById('selectType').value = 'goods';
                 
-                let singleCode = parts[0];
+                let singleCode = parts[0] || raw;
                 if (singleCode.length === 8 && !isNaN(singleCode)) {
                     currentBarcodeFormat = 'EAN8';
                 } else if (singleCode.length === 13 && !isNaN(singleCode)) {
