@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>7-ELEVEN POS 條碼、繳費單與兌換券系統</title>
+    
+    <meta name="theme-color" content="#0f172a">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="7-11 POS">
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3081/3081559.png">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700;900&display=swap');
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            background-color: #f1f5f9;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .bg-seven-stripe {
+            background: linear-gradient(135deg, #e11d48 0%, #e11d48 33%, #ea580c 33%, #ea580c 66%, #059669 66%, #059669 100%);
+        }
+        @media print {
+            .no-print { display: none !important; }
+            body { background: white !important; padding: 0 !important; }
+            .print-container { box-shadow: none !important; border: none !important; }
+        }
+    </style>
+</head>
+<body class="min-h-screen text-slate-800 pb-20 select-none">
+
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-50 no-print shadow-xs">
+        <div class="h-1.5 bg-seven-stripe w-full"></div>
+        <div class="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 bg-slate-900 text-white rounded-xl flex items-center justify-center font-black text-xl tracking-tighter shadow-sm border border-slate-800">
+                    7<span class="text-xs text-emerald-400">11</span>
+                </div>
+                <div>
+                    <h1 class="font-bold text-base md:text-lg leading-tight text-slate-900">7-ELEVEN POS Web App</h1>
+                    <p class="text-[11px] text-slate-500">相機掃描 / 智慧條碼解析 / 兌換券生成器</p>
+                </div>
+            </div>
+            <div class="flex items-center space-x-2">
+                <button onclick="window.print()" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-xl font-medium transition flex items-center space-x-1.5">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+                    <span class="hidden sm:inline">列印 / 存PDF</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-4xl mx-auto px-4 mt-6">
+
+        <section class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden print-container">
+            
+            <div class="bg-slate-900 text-white px-5 py-4 flex items-center justify-between">
+                <div class="flex items-center space-x-2.5">
+                    <span class="w-3 h-3 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <span class="font-bold text-sm tracking-wide">POS 條碼與相機掃描設定</span>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <span class="text-xs bg-slate-800 text-emerald-400 px-2.5 py-1 rounded-lg font-mono font-bold border border-slate-700" id="typeBadge">商品條碼</span>
+                </div>
+            </div>
+
+            <div class="p-5 space-y-6">
+                <div class="bg-slate-50 p-4 rounded-xl border border-slate-200/80 space-y-3.5 no-print">
+                    <div class="flex justify-between items-center text-xs font-bold text-slate-700 border-b border-slate-200 pb-2">
+                        <span class="flex items-center space-x-1.5">
+                            <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path></svg>
+                            <span>智慧辨識與相機掃描</span>
+                        </span>
+                        <div class="flex items-center space-x-2">
+                            <button onclick="toggleScanner()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center space-x-1 shadow-xs">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                                <span id="scannerBtnText">開啟相機掃描</span>
+                            </button>
+                            <label class="flex items-center space-x-1 cursor-pointer bg-slate-200 hover:bg-slate-300 text-slate-700 px-2.5 py-1.5 rounded-lg transition">
+                                <input type="checkbox" id="autoPlayCheckbox" onchange="toggleAutoPlay(this.checked)" class="rounded text-emerald-600 focus:ring-emerald-500 w-3.5 h-3.5">
+                                <span class="font-bold text-[11px]">⚡ 自動展示</span>
+                            </label>
+                            <button onclick="fillSampleData()" class="text-xs text-emerald-600 hover:text-emerald-700 font-semibold underline active:opacity-75">預設範例</button>
+                        </div>
+                    </div>
+
+                    <div id="scannerContainer" class="hidden bg-slate-900 p-3 rounded-xl border border-slate-700 text-center relative">
+                        <div id="reader" class="w-full max-w-md mx-auto overflow-hidden rounded-lg"></div>
+                        <button onclick="toggleScanner()" class="mt-3 text-xs bg-rose-600 hover:bg-rose-700 text-white px-4 py-1.5 rounded-lg font-bold transition">關閉相機</button>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-12 gap-3">
+                        <div class="sm:col-span-12">
+                            <label class="block text-[11px] font-semibold text-slate-500 mb-1">智慧萬能輸入框 (可透過相機掃描、手動輸入或貼上)</label>
+                            <input type="text" id="inputUniversal" value="20719128" placeholder="掃描或輸入條碼內容..." oninput="handleUniversalInput()" autofocus
+                                class="w-full px-3 py-2.5 bg-white border border-emerald-300 rounded-lg text-xs font-mono font-bold text-slate-800 focus:ring-2 focus:ring-emerald-500 outline-none shadow-xs">
+                        </div>
+
+                        <div class="sm:col-span-12 grid grid-cols-1 sm:grid-cols-12 gap-3 pt-2 border-t border-slate-200/60">
+                            <div class="sm:col-span-6">
+                                <label class="block text-[11px] font-semibold text-slate-500 mb-1">單號類型 (Type)</label>
+                                <select id="selectType" onchange="changeType(this.value)"
+                                    class="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-800 focus:ring-2 focus:ring-emerald-500 outline-none shadow-xs">
+                                    <option value="goods" selected>商品 (Goods)</option>
+                                    <option value="utility">繳費單 (Utility)</option>
+                                    <option value="egtc">電子兌換券 (EGTC)</option>
+                                </select>
+                            </div>
+                            <div class="sm:col-span-6" id="formatSelectWrapper">
+                                <label class="block text-[11px] font-semibold text-slate-500 mb-1">一維條碼格式 (Format)</label>
+                                <select id="selectBarcodeFormat" onchange="setBarcodeFormat(this.value)"
+                                    class="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-emerald-500 outline-none shadow-xs">
+                                    <option value="EAN8" selected>EAN-8 (8位數短條碼)</option>
+                                    <option value="EAN13">EAN-13 (13位數標準商品條碼)</option>
+                                    <option value="CODE128">CODE128 (通用型彈性字串)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="hidden">
+                            <input type="number" id="inputQty" value="1">
+                            <input type="text" id="inputCode1">
+                            <input type="text" id="inputCode2">
+                            <input type="text" id="inputCode3">
+                            <input type="text" id="inputEgtcBarcode1">
+                            <input type="text" id="inputEgtcBarcode2">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 border border-slate-100 rounded-xl p-4 bg-white">
+                    
+                    <div class="w-full text-center border-b md:border-b-0 md:border-r border-slate-100 pb-5 md:pb-0 md:pr-5 flex flex-col justify-between">
+                        <div>
+                            <div class="flex items-center justify-between text-xs text-slate-500 font-medium mb-3">
+                                <span class="flex items-center space-x-1.5">
+                                    <span class="w-2 h-2 rounded-full bg-orange-500"></span>
+                                    <span class="font-bold text-slate-700">1D Barcode (一維條碼)</span>
+                                </span>
+                                <span class="text-[10px] bg-orange-50 text-orange-700 px-2 py-0.5 rounded-md font-bold border border-orange-200" id="formatLabel">EAN8</span>
+                            </div>
+                            
+                            <div class="bg-slate-50/50 p-4 rounded-xl border border-slate-100 flex flex-col items-center justify-center min-h-[160px] space-y-4" id="barcode1DContainer">
+                                
+                                <div id="singleBarcodeWrapper" class="w-full flex flex-col items-center">
+                                    <svg id="barcode1D" class="max-w-full"></svg>
+                                </div>
+
+                                <div id="utilityBarcodesWrapper" class="w-full flex flex-col items-center space-y-3 hidden">
+                                    <div class="w-full flex flex-col items-center">
+                                        <span class="text-[10px] text-slate-400 mb-0.5">Code 1</span>
+                                        <svg id="barcodeCode1" class="max-w-full"></svg>
+                                    </div>
+                                    <div class="w-full flex flex-col items-center">
+                                        <span class="text-[10px] text-slate-400 mb-0.5">Code 2</span>
+                                        <svg id="barcodeCode2" class="max-w-full"></svg>
+                                    </div>
+                                    <div id="wrapperCode3" class="w-full flex flex-col items-center">
+                                        <span class="text-[10px] text-slate-400 mb-0.5">Code 3</span>
+                                        <svg id="barcodeCode3" class="max-w-full"></svg>
+                                    </div>
+                                </div>
+
+                                <div id="egtcBarcodesWrapper" class="w-full flex flex-col items-center space-y-3 hidden">
+                                    <div class="w-full flex flex-col items-center">
+                                        <span class="text-[10px] text-slate-400 mb-0.5">Barcode 1 (兌換券號)</span>
+                                        <svg id="barcodeEgtc1" class="max-w-full"></svg>
+                                    </div>
+                                    <div class="w-full flex flex-col items-center">
+                                        <span class="text-[10px] text-slate-400 mb-0.5">Barcode 2 (驗證碼)</span>
+                                        <svg id="barcodeEgtc2" class="max-w-full"></svg>
+                                    </div>
+                                </div>
+
+                                <div id="barcodeErrorMsg" class="hidden text-xs text-rose-600 bg-rose-50 border border-rose-200 p-2.5 rounded-lg w-full text-center font-medium">
+                                    條碼格式或長度錯誤
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="w-full text-center flex flex-col justify-between">
+                        <div>
+                            <div class="flex items-center justify-between text-xs text-slate-500 font-medium mb-3">
+                                <span class="flex items-center space-x-1.5">
+                                    <span class="w-2 h-2 rounded-full bg-blue-500"></span>
+                                    <span class="font-bold text-slate-700">QR Code (二維條碼)</span>
+                                </span>
+                                <span class="text-[10px] bg-blue-50 text-blue-700 px-2 py-0.5 rounded-md font-bold border border-blue-200">Auto Generate</span>
+                            </div>
+
+                            <div class="bg-slate-50/50 p-4 rounded-xl border border-slate-100 flex flex-col items-center justify-center min-h-[160px]">
+                                <div id="qrcode" class="bg-white p-3 rounded-xl border border-slate-200 shadow-xs inline-block"></div>
+                                <p id="qrDataText" class="text-[11px] font-mono text-slate-500 mt-3 break-all max-w-xs"></p>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+                <div class="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 border-t border-slate-100 text-xs text-slate-500">
+                    <div class="flex items-center space-x-2">
+                        <svg class="w-4 h-4 text-emerald-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        <span>點擊「開啟相機掃描」即可直接用鏡頭辨識實體條碼並自動輸入。</span>
+                    </div>
+                    <div class="font-mono text-[11px] bg-slate-100 text-slate-600 px-2.5 py-1 rounded-lg shrink-0">
+                        Status: <span id="statusText" class="text-emerald-600 font-bold">Ready</span>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+    </main>
+
+    <script>
+        let currentType = 'goods';
+        let currentBarcodeFormat = 'EAN8';
+        let autoPlayTimer = null;
+        let html5QrCode = null;
+        let isScanning = false;
+
+        const autoSamplePool = [
+            '20719128',
+            '4710088432101',
+            '131201788 9524294830000049',
+            '7500088501181646 GKGE047D'
+        ];
+        let autoIndex = 0;
+
+        window.addEventListener('DOMContentLoaded', () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const autoCode = urlParams.get('code');
+            if (autoCode) {
+                document.getElementById('inputUniversal').value = autoCode;
+            }
+            handleUniversalInput();
+        });
+
+        // 相機掃描開關控制
+        function toggleScanner() {
+            const container = document.getElementById('scannerContainer');
+            const btnText = document.getElementById('scannerBtnText');
+
+            if (!isScanning) {
+                container.classList.remove('hidden');
+                btnText.textContent = "關閉相機中...";
+                
+                if (!html5QrCode) {
+                    html5QrCode = new Html5Qrcode("reader");
+                }
+
+                html5QrCode.start(
+                    { facingMode: "environment" }, // 預設使用後鏡頭
+                    { fps: 10, qrbox: { width: 250, height: 150 } },
+                    (decodedText, decodedResult) => {
+                        // 成功掃描到條碼
+                        document.getElementById('inputUniversal').value = decodedText;
+                        handleUniversalInput();
+                        toggleScanner(); // 掃描成功後自動關閉鏡頭
+                    },
+                    (errorMessage) => {
+                        // 掃描中忽略未對準的錯誤
+                    }
+                ).then(() => {
+                    isScanning = true;
+                    btnText.textContent = "關閉相機";
+                }).catch(err => {
+                    console.error("無法啟動相機：", err);
+                    alert("無法啟動相機，請確認瀏覽器是否允許相機權限（需使用 HTTPS 或 localhost）。");
+                    container.classList.add('hidden');
+                    btnText.textContent = "開啟相機掃描";
+                });
+            } else {
+                if (html5QrCode && html5QrCode.isScanning) {
+                    html5QrCode.stop().then(() => {
+                        isScanning = false;
+                        container.classList.add('hidden');
+                        btnText.textContent = "開啟相機掃描";
+                    }).catch(err => {
+                        console.error("停止相機失敗：", err);
+                    });
+                } else {
+                    isScanning = false;
+                    container.classList.add('hidden');
+                    btnText.textContent = "開啟相機掃描";
+                }
+            }
+        }
+
+        document.getElementById('inputUniversal').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                this.select();
+            }
+        });
+
+        function handleUniversalInput() {
+            let raw = document.getElementById('inputUniversal').value.trim();
+            if (!raw) raw = "0";
+
+            const parts = raw.split(/[\s,\t]+/);
+
+            if (parts.length >= 3 || (parts.length === 2 && parts[0].length >= 7 && parts[1].length >= 10)) {
+                currentType = 'utility';
+                document.getElementById('selectType').value = 'utility';
+                document.getElementById('inputCode1').value = parts[0] || '';
+                document.getElementById('inputCode2').value = parts[1] || '';
+                document.getElementById('inputCode3').value = parts[2] || '';
+            } else if (parts.length === 2 && parts[0].length >= 15) {
+                currentType = 'egtc';
+                document.getElementById('selectType').value = 'egtc';
+                document.getElementById('inputEgtcBarcode1').value = parts[0];
+                document.getElementById('inputEgtcBarcode2').value = parts[1];
+            } else {
+                currentType = 'goods';
+                document.getElementById('selectType').value = 'goods';
+                document.getElementById('inputBarcode').value = parts[0];
+                
+                if (parts[0].length === 8 && !isNaN(parts[0])) {
+                    currentBarcodeFormat = 'EAN8';
+                } else if (parts[0].length === 13 && !isNaN(parts[0])) {
+                    currentBarcodeFormat = 'EAN13';
+                } else {
+                    currentBarcodeFormat = 'CODE128';
+                }
+                document.getElementById('selectBarcodeFormat').value = currentBarcodeFormat;
+                document.getElementById('formatLabel').textContent = currentBarcodeFormat;
+            }
+
+            updateUIMode();
+            updateFromForm();
+        }
+
+        function changeType(type) {
+            currentType = type;
+            updateUIMode();
+            updateFromForm();
+        }
+
+        function updateUIMode() {
+            document.getElementById('singleBarcodeWrapper').classList.add('hidden');
+            document.getElementById('utilityBarcodesWrapper').classList.add('hidden');
+            document.getElementById('egtcBarcodesWrapper').classList.add('hidden');
+            document.getElementById('formatSelectWrapper').style.display = (currentType === 'goods') ? 'block' : 'none';
+
+            const typeBadge = document.getElementById('typeBadge');
+
+            if (currentType === 'goods') {
+                document.getElementById('singleBarcodeWrapper').classList.remove('hidden');
+                typeBadge.textContent = '商品條碼';
+            } else if (currentType === 'utility') {
+                document.getElementById('utilityBarcodesWrapper').classList.remove('hidden');
+                typeBadge.textContent = '繳費單條碼';
+            } else if (currentType === 'egtc') {
+                document.getElementById('egtcBarcodesWrapper').classList.remove('hidden');
+                typeBadge.textContent = '電子兌換券';
+            }
+        }
+
+        function setBarcodeFormat(format) {
+            currentBarcodeFormat = format;
+            document.getElementById('formatLabel').textContent = format;
+            updateFromForm();
+        }
+
+        function fillSampleData() {
+            document.getElementById('inputUniversal').value = '131201788 9524294830000049';
+            handleUniversalInput();
+        }
+
+        function toggleAutoPlay(isEnable) {
+            const statusText = document.getElementById('statusText');
+            if (isEnable) {
+                statusText.textContent = "Auto Running...";
+                statusText.className = "text-orange-600 font-bold animate-pulse";
+                autoPlayTimer = setInterval(() => {
+                    document.getElementById('inputUniversal').value = autoSamplePool[autoIndex];
+                    handleUniversalInput();
+                    autoIndex = (autoIndex + 1) % autoSamplePool.length;
+                }, 3000);
+            } else {
+                clearInterval(autoPlayTimer);
+                statusText.textContent = "Ready";
+                statusText.className = "text-emerald-600 font-bold";
+            }
+        }
+
+        function updateFromForm() {
+            const errorMsg = document.getElementById('barcodeErrorMsg');
+            errorMsg.classList.add('hidden');
+            let qrTextContent = "";
+
+            try {
+                if (currentType === 'goods') {
+                    let barcodeVal = document.getElementById('inputUniversal').value.trim();
+                    if (!barcodeVal) barcodeVal = "0";
+
+                    JsBarcode("#barcode1D", barcodeVal, {
+                        format: currentBarcodeFormat,
+                        lineColor: "#0f172a",
+                        width: 2.2,
+                        height: 70,
+                        displayValue: true,
+                        fontSize: 14,
+                        margin: 5
+                    });
+                    qrTextContent = `GOODS:${barcodeVal}|QTY:1`;
+
+                } else if (currentType === 'utility') {
+                    let c1 = document.getElementById('inputCode1').value.trim();
+                    let c2 = document.getElementById('inputCode2').value.trim();
+                    let c3 = document.getElementById('inputCode3').value.trim();
+
+                    if (c1) JsBarcode("#barcodeCode1", c1, { format: "CODE128", lineColor: "#0f172a", width: 1.8, height: 45, displayValue: true, fontSize: 12, margin: 3 });
+                    if (c2) JsBarcode("#barcodeCode2", c2, { format: "CODE128", lineColor: "#0f172a", width: 1.8, height: 45, displayValue: true, fontSize: 12, margin: 3 });
+                    
+                    const wrapperC3 = document.getElementById('wrapperCode3');
+                    if (c3) {
+                        wrapperC3.classList.remove('hidden');
+                        JsBarcode("#barcodeCode3", c3, { format: "CODE128", lineColor: "#0f172a", width: 1.8, height: 45, displayValue: true, fontSize: 12, margin: 3 });
+                    } else {
+                        wrapperC3.classList.add('hidden');
+                    }
+                    qrTextContent = `UTILITY:${c1}\t${c2}\t${c3}`;
+
+                } else if (currentType === 'egtc') {
+                    let e1 = document.getElementById('inputEgtcBarcode1').value.trim();
+                    let e2 = document.getElementById('inputEgtcBarcode2').value.trim();
+
+                    if (e1) JsBarcode("#barcodeEgtc1", e1, { format: "CODE128", lineColor: "#0f172a", width: 2, height: 50, displayValue: true, fontSize: 12, margin: 3 });
+                    if (e2) JsBarcode("#barcodeEgtc2", e2, { format: "CODE128", lineColor: "#0f172a", width: 2, height: 50, displayValue: true, fontSize: 12, margin: 3 });
+                    qrTextContent = `EGTC:${e1}|${e2}`;
+                }
+
+                const qrContainer = document.getElementById('qrcode');
+                qrContainer.innerHTML = "";
+                new QRCode(qrContainer, {
+                    text: qrTextContent || "7-ELEVEN POS",
+                    width: 120,
+                    height: 120,
+                    colorDark: "#0f172a",
+                    colorLight: "#ffffff",
+                    correctLevel: QRCode.CorrectLevel.M
+                });
+
+                document.getElementById('qrDataText').textContent = qrTextContent;
+
+            } catch (err) {
+                console.error(err);
+                errorMsg.textContent = "條碼格式錯誤或超出支援字元範圍：" + err.message;
+                errorMsg.classList.remove('hidden');
+            }
+        }
+    </script>
+</body>
+</html>
