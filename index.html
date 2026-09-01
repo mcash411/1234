@@ -50,7 +50,7 @@
                 </div>
                 <div>
                     <h1 class="font-bold text-base md:text-lg leading-tight text-slate-900">7-ELEVEN POS Web App</h1>
-                    <p class="text-[11px] text-slate-500">一維條碼顯示 / 動態萬能輸入框 / QR Code 與批量儲存</p>
+                    <p class="text-[11px] text-slate-500">一維條碼 (繳費單改用 CODE39) / 動態萬能輸入框</p>
                 </div>
             </div>
             <div class="flex items-center space-x-2">
@@ -109,7 +109,7 @@
                             <select id="selectType" onchange="changeType(this.value)"
                                 class="w-full px-3 py-2.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-800 focus:ring-2 focus:ring-emerald-500 outline-none shadow-xs">
                                 <option value="goods" selected>商品 (Goods - 1組)</option>
-                                <option value="utility">繳費單 (Utility - 3組)</option>
+                                <option value="utility">繳費單 (Utility - 3組 Code39)</option>
                                 <option value="egtc">電子兌換券 (EGTC - 2組)</option>
                             </select>
                         </div>
@@ -159,15 +159,15 @@
 
                                 <div id="utilityBarcodesWrapper" class="w-full flex flex-col items-center space-y-3 hidden">
                                     <div class="w-full flex flex-col items-center">
-                                        <span class="text-[10px] text-slate-400 mb-0.5">Code 1</span>
+                                        <span class="text-[10px] text-slate-400 mb-0.5">Code 1 (Code39)</span>
                                         <svg id="barcodeCode1" class="max-w-full"></svg>
                                     </div>
                                     <div class="w-full flex flex-col items-center">
-                                        <span class="text-[10px] text-slate-400 mb-0.5">Code 2</span>
+                                        <span class="text-[10px] text-slate-400 mb-0.5">Code 2 (Code39)</span>
                                         <svg id="barcodeCode2" class="max-w-full"></svg>
                                     </div>
                                     <div id="wrapperCode3" class="w-full flex flex-col items-center">
-                                        <span class="text-[10px] text-slate-400 mb-0.5">Code 3</span>
+                                        <span class="text-[10px] text-slate-400 mb-0.5">Code 3 (Code39)</span>
                                         <svg id="barcodeCode3" class="max-w-full"></svg>
                                     </div>
                                 </div>
@@ -222,7 +222,7 @@
                     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center text-xs font-bold text-slate-700 border-b border-slate-200 pb-2 gap-2">
                         <span class="flex items-center space-x-1.5">
                             <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path></svg>
-                            <span>批量條碼輸入與相機連續掃描</span>
+                            <span>批量商品條碼輸入與相機連續掃描</span>
                         </span>
                         <div class="flex items-center flex-wrap gap-2">
                             <button onclick="toggleBatchScanner()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center space-x-1 shadow-xs">
@@ -239,20 +239,19 @@
                         <button onclick="toggleBatchScanner()" class="mt-2 text-xs bg-rose-600 hover:bg-rose-700 text-white px-4 py-1.5 rounded-lg font-bold transition">關閉相機</button>
                     </div>
 
-                    <!-- 批量新增條碼、數量與獨立備註工具列 -->
                     <div class="bg-white p-3.5 rounded-xl border border-slate-200/80 space-y-2.5 shadow-2xs">
                         <span class="text-[11px] font-bold text-slate-600 flex items-center space-x-1">
                             <svg class="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-                            <span>快速新增單筆條碼、數量與備註至下方</span>
+                            <span>快速新增商品條碼、數量與備註至下方</span>
                         </span>
                         
                         <div class="grid grid-cols-1 sm:grid-cols-12 gap-2">
                             <div class="sm:col-span-5">
-                                <input type="text" id="quickBatchCode" placeholder="條碼代碼 (例如 20719128)" 
+                                <input type="text" id="quickBatchCode" placeholder="商品條碼代碼 (例如 20719128)" 
                                     class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono font-bold text-slate-800 focus:ring-2 focus:ring-emerald-500 outline-none shadow-xs">
                             </div>
                             <div class="sm:col-span-4">
-                                <input type="text" id="quickBatchNote" placeholder="備註說明 (例如 鮮乳)" 
+                                <input type="text" id="quickBatchNote" placeholder="商品備註 (例如 鮮乳)" 
                                     class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-emerald-500 outline-none shadow-xs">
                             </div>
                             <div class="sm:col-span-3 flex items-center space-x-2">
@@ -269,17 +268,15 @@
                         </div>
                     </div>
 
-                    <!-- 下方文字輸入框 (支援 條碼, 數量, 備註 格式) -->
                     <div class="space-y-1">
                         <div class="flex justify-between items-center px-1">
                             <span class="text-[11px] font-bold text-slate-600">批量清單編輯區 (格式：條碼, 數量, 備註)</span>
                             <span class="text-[10px] text-slate-400">支援手動輸入與多行貼上</span>
                         </div>
-                        <textarea id="batchTextArea" rows="6" placeholder="例如：&#10;20719128, 2, 鮮乳特價&#10;131201788 9524294830000049, 1, 水電費帳單" 
+                        <textarea id="batchTextArea" rows="6" placeholder="例如：&#10;20719128, 2, 鮮乳特價&#10;ABC-12345, 1, 倉庫貨號" 
                             class="w-full px-3.5 py-3 bg-white border border-slate-300 rounded-xl text-xs font-mono text-slate-800 focus:ring-2 focus:ring-emerald-500 outline-none shadow-xs leading-relaxed"></textarea>
                     </div>
                     
-                    <!-- 批量設定工具列：一維格式選擇與 QR Code 顯示切換 -->
                     <div class="flex flex-col sm:flex-row justify-between items-center bg-white p-3 rounded-xl border border-slate-200 gap-3">
                         <div class="flex items-center space-x-2 w-full sm:w-auto">
                             <label class="text-[11px] font-bold text-slate-600 whitespace-nowrap">一維條碼格式：</label>
@@ -304,7 +301,7 @@
                     <div class="flex justify-end space-x-2 pt-1">
                         <button onclick="saveBatchBarcodes()" class="bg-slate-900 hover:bg-slate-800 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition shadow-xs flex items-center space-x-1.5">
                             <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path></svg>
-                            <span>儲存所有批量條碼</span>
+                            <span>儲存所有批量商品</span>
                         </button>
                         <button onclick="generateBatchBarcodes()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition shadow-xs">
                             立即批量生成
@@ -360,7 +357,7 @@
         window.addEventListener('DOMContentLoaded', () => {
             initDynamicInputs('goods');
             updateSavedCount();
-            document.getElementById('batchTextArea').value = "20719128, 2, 鮮乳特價\n131201788 9524294830000049, 1, 水電費帳單";
+            document.getElementById('batchTextArea').value = "20719128, 2, 鮮乳特價\nABC-12345, 1, 倉庫貨號";
             generateSingleBarcodes();
         });
 
@@ -425,7 +422,7 @@
                 `;
             } else if(type === 'utility') {
                 container.innerHTML = `
-                    <label class="block text-[11px] font-semibold text-slate-500 mb-1">繳費單三段式條碼與數量</label>
+                    <label class="block text-[11px] font-semibold text-slate-500 mb-1">繳費單三段式條碼與數量 (Code39)</label>
                     <div class="space-y-2">
                         <div class="flex items-center space-x-2">
                             <input type="text" id="uniField0" oninput="syncInputs()" value="131201788" placeholder="第一段條碼 (通常9碼)"
@@ -541,13 +538,14 @@
                     const c3 = document.getElementById('inputCode3').value.trim() || "0000000";
                     qrTextVal = `${c1}\n${c2}\n${c3}`;
 
-                    JsBarcode("#barcodeCode1", c1, { format: "CODE128", lineColor: "#0f172a", width: 1.8, height: 45, displayValue: true, fontSize: 12, margin: 2 });
-                    JsBarcode("#barcodeCode2", c2, { format: "CODE128", lineColor: "#0f172a", width: 1.5, height: 45, displayValue: true, fontSize: 12, margin: 2 });
+                    // 將繳費單的三段式條碼格式改為 CODE39
+                    JsBarcode("#barcodeCode1", c1, { format: "CODE39", lineColor: "#0f172a", width: 1.8, height: 45, displayValue: true, fontSize: 12, margin: 2 });
+                    JsBarcode("#barcodeCode2", c2, { format: "CODE39", lineColor: "#0f172a", width: 1.3, height: 45, displayValue: true, fontSize: 12, margin: 2 });
                     
                     const wrapperC3 = document.getElementById('wrapperCode3');
                     if(c3) {
                         wrapperC3.classList.remove('hidden');
-                        JsBarcode("#barcodeCode3", c3, { format: "CODE128", lineColor: "#0f172a", width: 1.8, height: 45, displayValue: true, fontSize: 12, margin: 2 });
+                        JsBarcode("#barcodeCode3", c3, { format: "CODE39", lineColor: "#0f172a", width: 1.8, height: 45, displayValue: true, fontSize: 12, margin: 2 });
                     } else {
                         wrapperC3.classList.add('hidden');
                     }
@@ -651,7 +649,7 @@
                 batchHtml5QrCode.start({ facingMode: "environment" }, config, (decodedText) => {
                     document.getElementById('batchScanFeedback').innerText = `已加入: ${decodedText}`;
                     const ta = document.getElementById('batchTextArea');
-                    ta.value += (ta.value ? "\n" : "") + `${decodedText}, 1, 掃描條碼`;
+                    ta.value += (ta.value ? "\n" : "") + `${decodedText}, 1, 掃描商品`;
                     generateBatchBarcodes();
                     setTimeout(() => { document.getElementById('batchScanFeedback').innerText = ""; }, 2000);
                 }, (errorMessage) => {}).catch(err => {
@@ -671,7 +669,7 @@
             const qtyVal = parseInt(qtyInput.value) || 1;
 
             if(!codeVal) {
-                alert("請輸入條碼內容！");
+                alert("請輸入商品條碼內容！");
                 codeInput.focus();
                 return;
             }
@@ -691,7 +689,7 @@
         }
 
         function fillBatchSample() {
-            document.getElementById('batchTextArea').value = "20719128, 2, 鮮乳特價\nABC-12345, 1, 倉庫貨號(Code39)\n131201788 9524294830000049, 1, 水電費帳單";
+            document.getElementById('batchTextArea').value = "20719128, 2, 鮮乳特價\nABC-12345, 1, 倉庫貨號(Code39)";
             generateBatchBarcodes();
         }
 
@@ -704,7 +702,7 @@
 
             const lines = text.split('\n').filter(l => l.trim() !== '');
             if(lines.length === 0) {
-                container.innerHTML = '<div class="text-center text-xs text-slate-400 py-6">目前尚無批量條碼資料</div>';
+                container.innerHTML = '<div class="text-center text-xs text-slate-400 py-6">目前尚無批量商品資料</div>';
                 return;
             }
 
@@ -724,7 +722,7 @@
                     <div class="flex-1 w-full text-center md:text-left">
                         <div class="flex flex-wrap items-center justify-between mb-2 gap-2">
                             <div class="flex items-center space-x-2">
-                                <span class="text-xs font-bold text-slate-500">項目 #${index + 1}</span>
+                                <span class="text-xs font-bold text-slate-500">商品 #${index + 1}</span>
                                 ${notePart ? `<span class="text-xs font-bold bg-emerald-50 text-emerald-700 px-2.5 py-0.5 rounded-md border border-emerald-200">${notePart}</span>` : ''}
                             </div>
                             <div class="flex items-center space-x-2">
@@ -776,7 +774,7 @@
             const text = document.getElementById('batchTextArea').value;
             const lines = text.split('\n').filter(l => l.trim() !== '');
             if(lines.length === 0) {
-                alert("沒有可儲存的批量條碼內容！");
+                alert("沒有可儲存的批量商品內容！");
                 return;
             }
 
@@ -784,10 +782,10 @@
                 let parts = line.split(',');
                 let codePart = parts[0].trim();
                 let qtyPart = parts[1] ? parseInt(parts[1].trim()) || 1 : 1;
-                let notePart = parts[2] ? parts[2].trim() : '批量條碼';
+                let notePart = parts[2] ? parts[2].trim() : '批量商品';
 
                 savedBarcodes.push({
-                    type: 'batch',
+                    type: 'goods',
                     code: codePart,
                     qty: qtyPart,
                     note: notePart,
@@ -797,7 +795,7 @@
 
             localStorage.setItem('seven_pos_saved', JSON.stringify(savedBarcodes));
             updateSavedCount();
-            alert(`成功儲存 ${lines.length} 筆條碼至我的清單！`);
+            alert(`成功儲存 ${lines.length} 筆商品條碼至我的清單！`);
         }
 
         function saveCurrentBarcode() {
