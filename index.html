@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>一維與二維條碼批量產生器與掃描器 (列印與輸出增強版)</title>
+    <title>一維與二維條碼批量產生器與掃描器 (畫布對齊列印版)</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- QRCode.js -->
@@ -13,21 +13,21 @@
     <!-- ZXing 掃描引擎 -->
     <script src="https://unpkg.com/@zxing/library@latest/umd/index.min.js"></script>
     <style id="pagePrintStyle">
-        /* 動態寫入動態紙張頁面列印尺寸 */
+        /* 動態寫入紙張列印頁面尺寸 */
         @page {
             size: A4 portrait;
             margin: 0;
         }
 
-        /* 完美複製預覽畫布至列印與 PDF 輸出 */
+        /* 預覽畫布 100% 精準對齊列印/PDF 輸出樣式 */
         @media print {
-            /* 隱藏全頁所有控制元件與無關元素 */
+            /* 隱藏 UI 控制面板、頁首、Modal 與畫布外圍裝飾 */
             .no-print, header, footer, #cameraModal, #pageNavToolbar, .card-hover-actions, .grid-cell-badge { 
                 display: none !important; 
             }
 
             body { 
-                background: white !important; 
+                background: #ffffff !important; 
                 padding: 0 !important; 
                 margin: 0 !important; 
                 overflow: visible !important;
@@ -44,6 +44,7 @@
                 display: none !important;
             }
 
+            /* 僅保留預覽畫布區域並填滿列印頁面 */
             #previewCardSection {
                 display: block !important;
                 width: 100% !important;
@@ -61,7 +62,7 @@
             }
 
             #galleryContainer {
-                background: white !important;
+                background: #ffffff !important;
                 border: none !important;
                 padding: 0 !important;
                 margin: 0 !important;
@@ -70,18 +71,18 @@
                 box-shadow: none !important;
             }
 
-            /* 紙張擬真邊框與分頁設定 */
+            /* 紙張分頁與邊界設定 */
             .paper-sheet {
                 box-shadow: none !important;
                 border: none !important;
                 padding: 4mm !important;
-                margin: 0 !important;
+                margin: 0 auto !important;
                 width: 100% !important;
                 max-width: 100% !important;
                 aspect-ratio: auto !important;
                 page-break-after: always !important;
                 break-after: page !important;
-                background: white !important;
+                background: #ffffff !important;
             }
 
             .paper-sheet:last-child {
@@ -108,7 +109,7 @@
                 border: 1px solid #000000 !important;
                 box-shadow: none !important;
                 padding: 4px !important;
-                background: white !important;
+                background: #ffffff !important;
             }
         }
         
@@ -227,7 +228,7 @@
                 </div>
                 <div>
                     <h1 class="text-lg font-bold tracking-wide leading-tight">條碼批量產生與列印系統</h1>
-                    <p class="text-[10px] text-slate-400">支援單張/批量條碼雙向同步、紙張邊界自動調整、POS QR 數量與精準條碼列印/輸出</p>
+                    <p class="text-[10px] text-slate-400">支援單張/批量雙向同步、自動邊界對齊、預覽畫布 1:1 精準 PDF/列印輸出</p>
                 </div>
             </div>
             
@@ -512,9 +513,9 @@
             <!-- 操作說明 -->
             <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200/80 text-xs text-slate-600 space-y-1 no-print">
                 <p class="font-bold text-slate-800 flex items-center space-x-1">
-                    <span>💡 條碼列印/輸出提示：</span>
+                    <span>💡 預覽畫布對齊列印提示：</span>
                 </p>
-                <p>點擊「列印 / 輸出 PDF 標籤頁」即可直接將畫布上的貼紙規格投射至印表機或輸出高清晰 PDF。可利用上方選單切換 A4 或超商貼紙等尺寸。</p>
+                <p>點擊「列印 / 輸出 PDF 標籤頁」時，將直接輸出預覽畫布中的擬真紙張與標籤佈局，無雜訊、不失真，並自動支援微軟/Chrome 內建 PDF 儲存。</p>
             </div>
         </section>
     </main>
@@ -1531,7 +1532,7 @@
             renderAll();
         });
 
-        // 觸發列印，自動展開所有頁面並喚起印表機/PDF輸出
+        // 觸發列印，自動展頁並驅動預覽畫布對齊列印/輸出
         document.getElementById('printLabelsBtn').addEventListener('click', () => {
             const checkbox = document.getElementById('showAllPagesCheckbox');
             const wasChecked = checkbox.checked;
