@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>一維與二維條碼批量產生器與掃描器 (雙向模式同步版)</title>
+    <title>一維與二維條碼批量產生器與掃描器 (列印與輸出增強版)</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- QRCode.js -->
@@ -227,7 +227,7 @@
                 </div>
                 <div>
                     <h1 class="text-lg font-bold tracking-wide leading-tight">條碼批量產生與列印系統</h1>
-                    <p class="text-[10px] text-slate-400">支援單張/批量條碼雙向同步、紙張邊界自動調整、POS QR 數量與畫布 100% 原樣列印</p>
+                    <p class="text-[10px] text-slate-400">支援單張/批量條碼雙向同步、紙張邊界自動調整、POS QR 數量與精準條碼列印/輸出</p>
                 </div>
             </div>
             
@@ -512,9 +512,9 @@
             <!-- 操作說明 -->
             <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200/80 text-xs text-slate-600 space-y-1 no-print">
                 <p class="font-bold text-slate-800 flex items-center space-x-1">
-                    <span>💡 雙向模式同步說明：</span>
+                    <span>💡 條碼列印/輸出提示：</span>
                 </p>
-                <p>切換「單張」與「批量」模式時，系統會自動同步您填寫的條碼內容、附註品名與交易數量，無須重複輸入！</p>
+                <p>點擊「列印 / 輸出 PDF 標籤頁」即可直接將畫布上的貼紙規格投射至印表機或輸出高清晰 PDF。可利用上方選單切換 A4 或超商貼紙等尺寸。</p>
             </div>
         </section>
     </main>
@@ -1369,7 +1369,6 @@
             const textarea = document.getElementById('batchTextarea');
             const lines = textarea.value.split('\n').map(l => l.trim()).filter(Boolean);
 
-            // 檢查清單是否已包含該條碼，避免重覆追加，若無則加入
             const isExist = lines.some(line => line.startsWith(singleCode));
             if (!isExist) {
                 if (lines.length === 0) {
@@ -1403,7 +1402,7 @@
 
         // 切換模式按鈕事件
         document.getElementById('modeSingleBtn').addEventListener('click', () => {
-            syncBatchToSingle(); // 從批量切回單張時同步第一筆資料
+            syncBatchToSingle();
             appMode = 'single';
             document.getElementById('modeSingleBtn').className = "px-3.5 py-1.5 rounded-lg text-xs font-bold bg-blue-600 text-white shadow";
             document.getElementById('modeBatchBtn').className = "px-3.5 py-1.5 rounded-lg text-xs font-bold text-slate-400 hover:text-white";
@@ -1413,7 +1412,7 @@
         });
 
         document.getElementById('modeBatchBtn').addEventListener('click', () => {
-            syncSingleToBatch(); // 切換至批量模式時自動同步單張數據
+            syncSingleToBatch();
             appMode = 'batch';
             document.getElementById('modeBatchBtn').className = "px-3.5 py-1.5 rounded-lg text-xs font-bold bg-blue-600 text-white shadow";
             document.getElementById('modeSingleBtn').className = "px-3.5 py-1.5 rounded-lg text-xs font-bold text-slate-400 hover:text-white";
