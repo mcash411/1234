@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>一維與二維條碼批量產生器與掃描器 (精準列印優化版)</title>
+    <title>一維與二維條碼批量產生器與掃描器 (畫布原樣輸出版)</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- QRCode.js -->
@@ -13,29 +13,17 @@
     <!-- ZXing 掃描引擎 -->
     <script src="https://unpkg.com/@zxing/library@latest/umd/index.min.js"></script>
     <style id="pagePrintStyle">
-        /* 動態預設列印尺寸 */
+        /* 動態寫入動態紙張頁面列印尺寸 */
         @page {
             size: A4 portrait;
-            margin: 6mm;
+            margin: 0;
         }
 
-        /* 印表機/印刷預覽極致優化 */
+        /* 完美複製預覽畫布至列印與 PDF 輸出 */
         @media print {
-            /* 隱藏所有非列印元件 */
-            .no-print, header, section, footer, #cameraModal { 
+            /* 隱藏全頁所有控制元件與無關元素 */
+            .no-print, header, footer, #cameraModal, #pageNavToolbar, .card-hover-actions, .grid-cell-badge { 
                 display: none !important; 
-            }
-
-            /* 強制顯示專屬列印區 */
-            #printOnlyArea {
-                display: block !important;
-                position: absolute !important;
-                top: 0 !important;
-                left: 0 !important;
-                width: 100% !important;
-                background: white !important;
-                margin: 0 !important;
-                padding: 0 !important;
             }
 
             body { 
@@ -45,21 +33,67 @@
                 overflow: visible !important;
             }
 
-            .print-paper-sheet {
+            main {
+                display: block !important;
+                max-width: 100% !important;
+                padding: 0 !important;
+                margin: 0 !important;
+            }
+
+            /* 隱藏左側與右側控制欄，僅保留預覽畫布卡片 */
+            section {
+                display: none !important;
+            }
+
+            #previewCardSection {
+                display: block !important;
+                width: 100% !important;
+                max-width: 100% !important;
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+
+            #previewCard {
+                border: none !important;
                 box-shadow: none !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                background: transparent !important;
+            }
+
+            #galleryContainer {
+                background: white !important;
                 border: none !important;
                 padding: 0 !important;
                 margin: 0 !important;
+                max-height: none !important;
+                overflow: visible !important;
+                box-shadow: none !important;
+            }
+
+            /* 紙張擬真邊框與分頁設定 */
+            .paper-sheet {
+                box-shadow: none !important;
+                border: none !important;
+                padding: 4mm !important;
+                margin: 0 !important;
                 width: 100% !important;
                 max-width: 100% !important;
+                aspect-ratio: auto !important;
                 page-break-after: always !important;
                 break-after: page !important;
                 background: white !important;
             }
 
-            .print-paper-sheet:last-child {
+            .paper-sheet:last-child {
                 page-break-after: auto !important;
                 break-after: auto !important;
+            }
+
+            .paper-margin-guide {
+                border: 1px dashed #cbd5e1 !important;
+                padding: 2mm !important;
+                height: 100% !important;
             }
 
             .print-grid {
@@ -77,16 +111,8 @@
                 padding: 4px !important;
                 background: white !important;
             }
-
-            .card-hover-actions, .grid-cell-badge {
-                display: none !important;
-            }
         }
-
-        #printOnlyArea {
-            display: none;
-        }
-
+        
         /* 雷射掃描對焦動畫 */
         .scanner-container {
             position: relative;
@@ -202,7 +228,7 @@
                 </div>
                 <div>
                     <h1 class="text-lg font-bold tracking-wide leading-tight">條碼批量產生與列印系統</h1>
-                    <p class="text-[10px] text-slate-400">支援單張/批量條碼、紙張邊界自動調整、POS QR 數量與精準 PDF/紙張輸出</p>
+                    <p class="text-[10px] text-slate-400">支援單張/批量條碼、紙張邊界自動調整、POS QR 數量與畫布 100% 原樣列印</p>
                 </div>
             </div>
             
@@ -218,10 +244,10 @@
         </div>
     </header>
 
-    <main class="max-w-7xl mx-auto px-4 py-6 grid grid-cols-1 lg:grid-cols-12 gap-6 no-print">
+    <main class="max-w-7xl mx-auto px-4 py-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
         
         <!-- 左側：設定控制台與即時預覽畫布 -->
-        <section class="lg:col-span-6 space-y-6">
+        <section id="previewCardSection" class="lg:col-span-6 space-y-6">
             
             <!-- 條碼參數設定區 -->
             <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200/80 no-print space-y-5">
@@ -345,7 +371,7 @@
         </section>
 
         <!-- 右側：批量輸入、標籤附註、排版與導出按鈕 -->
-        <section class="lg:col-span-6 space-y-6">
+        <section class="lg:col-span-6 space-y-6 no-print">
             
             <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200/80 no-print space-y-5">
                 
@@ -487,15 +513,12 @@
             <!-- 操作說明 -->
             <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200/80 text-xs text-slate-600 space-y-1 no-print">
                 <p class="font-bold text-slate-800 flex items-center space-x-1">
-                    <span>💡 畫布輸出與列印提示：</span>
+                    <span>💡 畫布 100% 原樣列印輸出說明：</span>
                 </p>
-                <p>按下「列印 / 輸出 PDF 標籤頁」時，系統會自動剔除 UI 介面與預覽樣式，精準複製當前預覽畫布中的所有標籤進行輸出。</p>
+                <p>點擊「列印 / 輸出 PDF 標籤頁」按鈕後，系統會自動隱藏選單面板，並精準複製與放大畫布內容進行滿版輸出。</p>
             </div>
         </section>
     </main>
-
-    <!-- 專屬列印區域，列印時才會透過 @media print 顯示 -->
-    <div id="printOnlyArea"></div>
 
     <!-- 相機掃描 Modal 對話框 -->
     <div id="cameraModal" class="fixed inset-0 bg-slate-900/85 backdrop-blur-md z-50 flex items-center justify-center hidden no-print">
@@ -552,7 +575,7 @@
         const L_CODE = ["0001101", "0011001", "0010011", "0111101", "0100011", "0110001", "0101111", "0111011", "0110111", "0001011"];
         const G_CODE = ["0100111", "0110011", "0011011", "0100001", "0011101", "0111001", "0000101", "0010001", "0001001", "0010111"];
         const R_CODE = ["1110010", "1100110", "1101100", "1000010", "1011100", "1001110", "1010000", "1000100", "1001000", "1110100"];
-        const PARITY_PATTERNS = ["LLLLLL", "LLGLGG", "LLGGLG", "LLGGGL", "LGLLGG", "LGGLLG", "LGGGLL", "LGLGLG", "LGLGGL", "LGGLGL"];
+        const PARITY_PATTERNS = ["LLLLLL", "LLGLGG", "LLGGLG", "LLGGGL", "LGLLGG", "LGGGLL", "LGGGLL", "LGLGLG", "LGLGGL", "LGGLGL"];
 
         const CODE128_PATTERNS = [
             "212222", "222122", "222221", "121223", "121322", "131222", "122213", "122312", "132212", "221213",
@@ -794,7 +817,7 @@
             printStyleEl.innerHTML = `
                 @page {
                     size: ${paperInfo.sizeCss};
-                    margin: 6mm;
+                    margin: 0;
                 }
             `;
 
@@ -882,7 +905,7 @@
             }
         }
 
-        // 渲染主畫布與準備列印資料 DOM
+        // 渲染主畫布：包含預覽與輸出
         function renderAll() {
             updateUIControlsState();
 
@@ -902,12 +925,10 @@
 
             const items = getBatchItemsList();
             const galleryContainer = document.getElementById('galleryContainer');
-            const printOnlyArea = document.getElementById('printOnlyArea');
             const itemCounterBadge = document.getElementById('itemCounterBadge');
 
             itemCounterBadge.textContent = `${items.length} 個標籤`;
             galleryContainer.innerHTML = '';
-            printOnlyArea.innerHTML = '';
 
             document.documentElement.style.setProperty('--print-cols', printCols);
 
@@ -932,9 +953,9 @@
                 activePageIdx = 0;
             }
 
-            const showAllPages = document.getElementById('showAllPagesCheckbox').checked;
+            const isPrinting = window.matchMedia('print').matches;
+            const showAllPages = document.getElementById('showAllPagesCheckbox').checked || isPrinting;
 
-            // 1. 渲染畫面上的預覽畫布 (Preview Area)
             for (let p = 0; p < totalPages; p++) {
                 if (!showAllPages && p !== activePageIdx) continue;
 
@@ -1033,57 +1054,6 @@
                 marginGuide.appendChild(grid);
                 sheet.appendChild(marginGuide);
                 galleryContainer.appendChild(sheet);
-            }
-
-            // 2. 構建純淨列印專用 DOM 結構 (#printOnlyArea)，確保無干擾輸出
-            for (let p = 0; p < totalPages; p++) {
-                const pageItems = items.slice(p * pageSizeLimit, (p + 1) * pageSizeLimit);
-                const printSheet = document.createElement('div');
-                printSheet.className = "print-paper-sheet";
-
-                const printGrid = document.createElement('div');
-                printGrid.className = "print-grid";
-                printGrid.style.display = "grid";
-                printGrid.style.gridTemplateColumns = `repeat(${printCols}, minmax(0, 1fr))`;
-                printGrid.style.gap = "6px";
-
-                const enableNote = document.getElementById('enableNote').checked;
-
-                pageItems.forEach((item, idxWithinPage) => {
-                    const printGlobalIdx = p * pageSizeLimit + idxWithinPage;
-                    const printCard = document.createElement('div');
-                    printCard.className = "print-card flex flex-col items-center justify-center";
-
-                    const notePos = document.getElementById('notePosition').value;
-                    const noteAlign = document.getElementById('noteAlign').value;
-
-                    let alignClass = "text-center";
-                    if (noteAlign === 'left') alignClass = "text-left";
-                    if (noteAlign === 'right') alignClass = "text-right";
-
-                    if (outputDimension === '1D') {
-                        const svgId = `print-barcode-svg-${printGlobalIdx}`;
-                        printCard.innerHTML = `
-                            ${enableNote && item.note && notePos === 'top' ? `<div class="text-[10px] font-bold text-black mb-1 w-full truncate ${alignClass}">${item.note}</div>` : ''}
-                            <svg id="${svgId}" class="w-full h-auto max-w-full mx-auto"></svg>
-                            ${enableNote && item.note && notePos === 'bottom' ? `<div class="text-[10px] font-bold text-black mt-1 w-full truncate ${alignClass}">${item.note}</div>` : ''}
-                        `;
-                        printGrid.appendChild(printCard);
-                        setTimeout(() => renderSvg1D(svgId, item, calculatedHeight), 0);
-                    } else {
-                        const qrId = `print-qr-container-${printGlobalIdx}`;
-                        printCard.innerHTML = `
-                            ${enableNote && item.note && notePos === 'top' ? `<div class="text-[10px] font-bold text-black mb-1 w-full truncate ${alignClass}">${item.note}</div>` : ''}
-                            <div id="${qrId}" class="flex justify-center p-0.5"></div>
-                            ${enableNote && item.note && notePos === 'bottom' ? `<div class="text-[10px] font-bold text-black mt-1 w-full truncate ${alignClass}">${item.note}</div>` : ''}
-                        `;
-                        printGrid.appendChild(printCard);
-                        setTimeout(() => renderQr2D(qrId, item.code, item.quantity), 0);
-                    }
-                });
-
-                printSheet.appendChild(printGrid);
-                printOnlyArea.appendChild(printSheet);
             }
         }
 
@@ -1516,14 +1486,22 @@
             renderAll();
         });
 
-        // 觸發列印
+        // 觸發列印，自動展開所有頁面並喚起印表機/PDF輸出
         document.getElementById('printLabelsBtn').addEventListener('click', () => {
+            const checkbox = document.getElementById('showAllPagesCheckbox');
+            const wasChecked = checkbox.checked;
+            checkbox.checked = true;
             renderAll();
+            
             setTimeout(() => {
                 window.print();
-            }, 150);
+                if (!wasChecked) {
+                    checkbox.checked = false;
+                    renderAll();
+                }
+            }, 100);
         });
-        
+
         document.getElementById('downloadBatchZipBtn').addEventListener('click', downloadBatchZip);
 
         applyPaperPreset('A4');
