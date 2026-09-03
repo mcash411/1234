@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>一維與二維條碼批量產生器與掃描器 (畫布對齊列印版)</title>
+    <title>一維與二維條碼批量產生器與掃描器 (純淨標籤排版列印版)</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- QRCode.js -->
@@ -13,16 +13,16 @@
     <!-- ZXing 掃描引擎 -->
     <script src="https://unpkg.com/@zxing/library@latest/umd/index.min.js"></script>
     <style id="pagePrintStyle">
-        /* 動態寫入紙張列印頁面尺寸 */
+        /* 動態寫入紙張列印頁面尺寸與方向 */
         @page {
             size: A4 portrait;
             margin: 0;
         }
 
-        /* 預覽畫布 100% 精準對齊列印/PDF 輸出樣式 */
+        /* 列印模式：完全隱藏網頁 UI 雜項，僅保留「條碼 + 商品品名/附註」 */
         @media print {
-            /* 隱藏 UI 控制面板、頁首、Modal 與畫布外圍裝飾 */
-            .no-print, header, footer, #cameraModal, #pageNavToolbar, .card-hover-actions, .grid-cell-badge { 
+            /* 隱藏 UI 控制面板、頁首、Modal、格位編號與畫布外圍裝飾 */
+            .no-print, header, footer, #cameraModal, #pageNavToolbar, .card-hover-actions, .grid-cell-badge, .sheet-header { 
                 display: none !important; 
             }
 
@@ -40,11 +40,12 @@
                 margin: 0 !important;
             }
 
+            /* 隱藏左側與右側操控選單面板 */
             section {
                 display: none !important;
             }
 
-            /* 僅保留預覽畫布區域並填滿列印頁面 */
+            /* 僅保留預覽畫布區域並滿版列印 */
             #previewCardSection {
                 display: block !important;
                 width: 100% !important;
@@ -71,7 +72,7 @@
                 box-shadow: none !important;
             }
 
-            /* 紙張分頁與邊界設定 */
+            /* 紙張分頁與邊界精準輸出 */
             .paper-sheet {
                 box-shadow: none !important;
                 border: none !important;
@@ -91,9 +92,9 @@
             }
 
             .paper-margin-guide {
-                border: 1px dashed #cbd5e1 !important;
-                padding: 2mm !important;
-                height: 100% !important;
+                border: none !important;
+                padding: 0 !important;
+                height: auto !important;
             }
 
             .print-grid {
@@ -110,6 +111,29 @@
                 box-shadow: none !important;
                 padding: 4px !important;
                 background: #ffffff !important;
+            }
+
+            /* 單一條碼列印模式時的無干擾獨立輸出 */
+            body.print-single-mode .paper-sheet {
+                display: none !important;
+            }
+
+            body.print-single-mode .paper-sheet.target-single-sheet {
+                display: block !important;
+                page-break-after: auto !important;
+                break-after: auto !important;
+            }
+
+            body.print-single-mode .print-card {
+                display: none !important;
+            }
+
+            body.print-single-mode .print-card.target-single-card {
+                display: flex !important;
+                width: 100% !important;
+                max-width: 80mm !important;
+                margin: 0 auto !important;
+                border: 1px solid #000000 !important;
             }
         }
         
@@ -170,7 +194,7 @@
         .paper-sheet {
             background: #ffffff;
             box-shadow: 0 12px 28px -4px rgba(15, 23, 42, 0.12), 0 8px 12px -6px rgba(15, 23, 42, 0.08), 0 0 0 1px rgba(15, 23, 42, 0.06);
-            transition: width 0.3s ease;
+            transition: all 0.3s ease;
             margin: 0 auto 24px auto;
             position: relative;
         }
@@ -228,7 +252,7 @@
                 </div>
                 <div>
                     <h1 class="text-lg font-bold tracking-wide leading-tight">條碼批量產生與列印系統</h1>
-                    <p class="text-[10px] text-slate-400">支援單張/批量雙向同步、自動邊界對齊、預覽畫布 1:1 精準 PDF/列印輸出</p>
+                    <p class="text-[10px] text-slate-400">保留條碼與商品品名、支援自動與手動排版設定、純淨標籤列印</p>
                 </div>
             </div>
             
@@ -249,8 +273,8 @@
         <!-- 左側：設定控制台與即時預覽畫布 -->
         <section id="previewCardSection" class="lg:col-span-6 space-y-6">
             
-            <!-- 條碼參數設定區 -->
-            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200/80 no-print space-y-5">
+            <!-- 條碼參數設定區 (列印時自動隱藏) -->
+            <div id="typeConfigPanel" class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200/80 no-print space-y-5">
                 <div class="flex justify-between items-center border-b border-slate-100 pb-3">
                     <h2 id="sectionTitle" class="text-base font-bold text-slate-900 flex items-center space-x-2">
                         <span>條碼格式與類型</span>
@@ -275,7 +299,7 @@
                 <div>
                     <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">輸出維度</label>
                     <div class="grid grid-cols-2 gap-2">
-                        <button type="button" id="dimension1DBtn" class="py-1.5 px-2 text-xs font-bold rounded-lg border border-slate-300 bg-slate-100 text-slate-800 text-center active-dim">一維標準條碼</button>
+                        <button type="button" id="dimension1DBtn" class="py-1.5 px-2 text-xs font-bold rounded-lg border border-slate-300 bg-slate-100 text-slate-800 text-center">一維標準條碼</button>
                         <button type="button" id="dimension2DBtn" class="py-1.5 px-2 text-xs font-bold rounded-lg border border-slate-200 bg-slate-50 text-slate-500 text-center">二維 POS QR Code</button>
                     </div>
                 </div>
@@ -333,12 +357,22 @@
                                 <span>預覽畫布 (Preview Canvas)</span>
                                 <span id="itemCounterBadge" class="bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-md text-[10px] font-bold font-mono">1 個標籤</span>
                             </h3>
-                            <p id="paperDimHintText" class="text-[11px] text-slate-500 font-medium">規格：A4 全頁標籤紙 (210 × 297 mm)</p>
+                            <p id="paperDimHintText" class="text-[11px] text-slate-500 font-medium">規格：A4 全頁標籤紙 (210 × 297 mm, 直向)</p>
                         </div>
                     </div>
 
-                    <!-- 紙張規格與預覽操作區 -->
+                    <!-- 紙張規格與方向設定區 (即時驅動畫布與排版) -->
                     <div class="flex items-center space-x-2 w-full sm:w-auto justify-between sm:justify-end">
+                        <!-- 紙張方向切換按鈕 -->
+                        <div class="bg-slate-100 p-0.5 rounded-lg border border-slate-200 flex space-x-0.5">
+                            <button type="button" id="orientPortraitBtn" class="px-2 py-1 rounded text-[11px] font-bold bg-white text-blue-700 shadow-sm transition" title="直向預覽與列印">
+                                📱 直向
+                            </button>
+                            <button type="button" id="orientLandscapeBtn" class="px-2 py-1 rounded text-[11px] font-bold text-slate-600 hover:text-slate-900 transition" title="橫向預覽與列印">
+                                💻 橫向
+                            </button>
+                        </div>
+
                         <select id="paperPresetSelect" class="px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-blue-500 transition cursor-pointer">
                             <option value="A4" selected>📄 A4 全頁 (210 x 297 mm)</option>
                             <option value="LABEL_100x150">🏷️ 超商三模標籤紙 (100 x 150 mm)</option>
@@ -363,7 +397,7 @@
                     </label>
                 </div>
                 
-                <!-- 單張與批量預覽畫布面板 (具備容器大小自動填滿機制) -->
+                <!-- 單張與批量預覽畫布面板 (直/橫向即時重排反應) -->
                 <div id="galleryContainer" class="w-full checkerboard-bg rounded-xl border border-slate-200/80 p-4 sm:p-6 min-h-[420px] max-h-[680px] overflow-y-auto flex flex-col items-center justify-start shadow-inner space-y-6">
                     <!-- 動態模擬紙張 Sheet -->
                 </div>
@@ -426,7 +460,7 @@
                     </div>
                 </div>
 
-                <!-- 商品標籤附註設定 -->
+                <!-- 商品標籤附註設定 (列印時完整保留與顯示) -->
                 <div id="notePanel" class="space-y-3">
                     <div class="flex items-center justify-between">
                         <h3 class="text-xs font-bold text-slate-700 uppercase tracking-wider">商品標籤附註 (Note)</h3>
@@ -462,9 +496,15 @@
                     </div>
                 </div>
 
-                <!-- 排版與尺寸設定 -->
+                <!-- 排版與尺寸設定 (支援自動排版與手動調整) -->
                 <div class="space-y-3 border-t border-slate-100 pt-4">
-                    <h3 class="text-xs font-bold text-slate-700 uppercase tracking-wider">標籤列印與尺寸排版</h3>
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-xs font-bold text-slate-700 uppercase tracking-wider">標籤列印與尺寸排版</h3>
+                        <label for="autoLayoutCheckbox" class="text-xs text-blue-600 font-semibold flex items-center cursor-pointer select-none">
+                            <input type="checkbox" id="autoLayoutCheckbox" checked class="w-4 h-4 text-blue-600 rounded mr-1.5 focus:ring-blue-500 accent-blue-600">
+                            <span>自動調整排版 (Auto Layout)</span>
+                        </label>
+                    </div>
                     
                     <!-- 第一行：單筆張數與 列印欄數 -->
                     <div class="grid grid-cols-2 gap-2">
@@ -475,7 +515,7 @@
                         </div>
                         <div>
                             <label for="printColsSelect" class="block text-[11px] font-medium text-slate-500 mb-1">頁面排版欄數</label>
-                            <select id="printColsSelect" class="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none">
+                            <select id="printColsSelect" class="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none disabled:opacity-50">
                                 <option value="1">單欄橫跨 (1 欄)</option>
                                 <option value="2">每頁 2 欄 (大貼紙)</option>
                                 <option value="3" selected>每頁 3 欄 (標準規格)</option>
@@ -489,12 +529,27 @@
                         <div class="flex justify-between items-center">
                             <label for="autoHeightCheckbox" class="text-xs text-blue-700 font-bold flex items-center cursor-pointer select-none">
                                 <input type="checkbox" id="autoHeightCheckbox" checked class="w-4 h-4 text-blue-600 rounded mr-1.5 focus:ring-blue-500 accent-blue-600">
-                                <span>自動調整高度 (Auto Height)</span>
+                                <span>自動調整條碼高度 (Auto Bar Height)</span>
                             </label>
                             <span id="barHeightValueText" class="text-[11px] font-mono font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-100">自動 70px</span>
                         </div>
                         <input type="range" id="barHeight" min="40" max="140" value="70" class="w-full accent-blue-600 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">
                     </div>
+                </div>
+
+                <!-- 導出圖片格式設定 -->
+                <div id="exportFormatArea" class="bg-blue-50/40 p-3.5 rounded-xl border border-blue-100/80 space-y-2 border-t border-slate-100">
+                    <div class="flex justify-between items-center">
+                        <label for="exportImageFormatSelect" class="text-xs font-bold text-blue-900 flex items-center space-x-1">
+                            <span>🖼️ 導出圖片格式 (Format)</span>
+                        </label>
+                        <span class="text-[10px] text-blue-600 font-semibold">單張/ZIP 下載生效</span>
+                    </div>
+                    <select id="exportImageFormatSelect" class="w-full px-2.5 py-1.5 bg-white border border-blue-200 rounded-lg text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-blue-500 transition cursor-pointer">
+                        <option value="png" selected>PNG 格式 (無損高解析度，推薦印刷)</option>
+                        <option value="jpeg">JPEG 格式 (標準廣泛相容，白色底)</option>
+                        <option value="webp">WEBP 格式 (高壓縮率，極小檔案規格)</option>
+                    </select>
                 </div>
 
                 <!-- 下載與匯出按鈕組 -->
@@ -505,17 +560,18 @@
                     </button>
                     <button id="printLabelsBtn" class="w-full bg-slate-800 hover:bg-slate-900 text-white font-semibold py-2.5 px-4 rounded-xl shadow-sm transition-all flex items-center justify-center space-x-2 text-sm">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
-                        <span>列印 / 輸出 PDF 標籤頁</span>
+                        <span>列印 / 輸出 PDF 標籤頁 (條碼+品名)</span>
                     </button>
                 </div>
             </div>
 
-            <!-- 操作說明 -->
-            <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200/80 text-xs text-slate-600 space-y-1 no-print">
+            <!-- 操作說明 (列印時自動隱藏) -->
+            <div id="printTipsPanel" class="bg-slate-50 p-4 rounded-2xl border border-slate-200/80 text-xs text-slate-600 space-y-1 no-print">
                 <p class="font-bold text-slate-800 flex items-center space-x-1">
-                    <span>💡 預覽畫布對齊列印提示：</span>
+                    <span>💡 條碼純淨列印與排版說明：</span>
                 </p>
-                <p>點擊「列印 / 輸出 PDF 標籤頁」時，將直接輸出預覽畫布中的擬真紙張與標籤佈局，無雜訊、不失真，並自動支援微軟/Chrome 內建 PDF 儲存。</p>
+                <p>1. **完整保留條碼與品名**：列印時會完整保留條碼圖案與商品品名附註，並去除網頁邊框與選單。</p>
+                <p>2. **自動/手動排版切換**：開啟「自動調整排版」可自動計算最佳欄數與容量；關閉後可自訂欄數與條碼高度。</p>
             </div>
         </section>
     </main>
@@ -583,22 +639,88 @@
             "221231", "213212", "223112", "312131", "311222", "321122", "321221", "312212", "322112", "322211",
             "212123", "212321", "201321", "111323", "131123", "131321", "112313", "132113", "132311", "211313",
             "231113", "231311", "112133", "112331", "132131", "113123", "113321", "133121", "313121", "211331",
-            "231131", "213113", "213311", "213131", "311123", "311321", "331121", "312113", "312311", "332111",
-            "314111", "221411", "431111", "111224", "111422", "121124", "121421", "141122", "141221", "112214",
-            "112412", "122114", "122411", "142112", "142211", "241211", "221114", "413111", "241112", "134111",
-            "111242", "121142", "121241", "114212", "124112", "124211", "411212", "421112", "421211", "212141",
-            "214121", "412121", "111143", "111341", "131141", "114113", "114311", "411113", "411311", "113141",
-            "114131", "311141", "411131", "211412", "211214", "211232", "2331112"
+            "231131", "213113", "213311", "213131", "311123", "311321", "331121", "312113", "332111", "314111",
+            "221411", "431111", "111224", "111422", "121124", "121421", "141122", "141221", "112214", "112412",
+            "122114", "122411", "142112", "142211", "241211", "221114", "413111", "241112", "134111", "111242",
+            "121142", "121241", "114212", "124112", "124211", "411212", "421112", "421211", "212141", "214121",
+            "412121", "111143", "111341", "131141", "114113", "114311", "411113", "411311", "113141", "114131",
+            "311141", "411131", "211412", "211214", "211232", "2331112"
         ];
 
-        // 常用紙張規格表與容量定義
+        // 常用紙張規格表與容量定義（含直向與橫向容量對應）
         const PAPER_PRESETS = {
-            'A4': { name: 'A4 全頁標籤紙', sizeCss: 'A4 portrait', widthMm: 210, heightMm: 297, aspectRatio: '210/297', defaultCols: 3, itemsPerPage: { 1: 10, 2: 18, 3: 24, 4: 32 } },
-            'LABEL_100x150': { name: '超商三模標籤紙', sizeCss: '100mm 150mm', widthMm: 100, heightMm: 150, aspectRatio: '100/150', defaultCols: 1, itemsPerPage: { 1: 3, 2: 6, 3: 9, 4: 12 } },
-            'LABEL_100x100': { name: '雙模物流標籤紙', sizeCss: '100mm 100mm', widthMm: 100, heightMm: 100, aspectRatio: '1/1', defaultCols: 1, itemsPerPage: { 1: 2, 2: 4, 3: 6, 4: 8 } },
-            'LABEL_70x50': { name: '商品中貼紙', sizeCss: '70mm 50mm', widthMm: 70, heightMm: 50, aspectRatio: '70/50', defaultCols: 1, itemsPerPage: { 1: 1, 2: 2, 3: 3, 4: 4 } },
-            'LABEL_50x30': { name: '商品小貼紙', sizeCss: '50mm 30mm', widthMm: 50, heightMm: 30, aspectRatio: '50/30', defaultCols: 1, itemsPerPage: { 1: 1, 2: 2, 3: 3, 4: 4 } },
-            'CUSTOM': { name: '自訂長寬規格', sizeCss: 'auto', widthMm: 210, heightMm: 297, aspectRatio: 'auto', defaultCols: 2, itemsPerPage: { 1: 8, 2: 16, 3: 24, 4: 32 } }
+            'A4': { 
+                name: 'A4 全頁標籤紙', 
+                sizeCss: 'A4', 
+                widthMm: 210, 
+                heightMm: 297, 
+                aspectRatioPortrait: '210/297', 
+                aspectRatioLandscape: '297/210', 
+                defaultColsPortrait: 3, 
+                defaultColsLandscape: 4,
+                itemsPerPagePortrait: { 1: 10, 2: 18, 3: 24, 4: 32 },
+                itemsPerPageLandscape: { 1: 8, 2: 14, 3: 18, 4: 24 }
+            },
+            'LABEL_100x150': { 
+                name: '超商三模標籤紙', 
+                sizeCss: '100mm 150mm', 
+                widthMm: 100, 
+                heightMm: 150, 
+                aspectRatioPortrait: '100/150', 
+                aspectRatioLandscape: '150/100', 
+                defaultColsPortrait: 1, 
+                defaultColsLandscape: 2,
+                itemsPerPagePortrait: { 1: 3, 2: 6, 3: 9, 4: 12 },
+                itemsPerPageLandscape: { 1: 2, 2: 4, 3: 6, 4: 8 }
+            },
+            'LABEL_100x100': { 
+                name: '雙模物流標籤紙', 
+                sizeCss: '100mm 100mm', 
+                widthMm: 100, 
+                heightMm: 100, 
+                aspectRatioPortrait: '1/1', 
+                aspectRatioLandscape: '1/1', 
+                defaultColsPortrait: 1, 
+                defaultColsLandscape: 1,
+                itemsPerPagePortrait: { 1: 2, 2: 4, 3: 6, 4: 8 },
+                itemsPerPageLandscape: { 1: 2, 2: 4, 3: 6, 4: 8 }
+            },
+            'LABEL_70x50': { 
+                name: '商品中貼紙', 
+                sizeCss: '70mm 50mm', 
+                widthMm: 70, 
+                heightMm: 50, 
+                aspectRatioPortrait: '70/50', 
+                aspectRatioLandscape: '50/70', 
+                defaultColsPortrait: 1, 
+                defaultColsLandscape: 1,
+                itemsPerPagePortrait: { 1: 1, 2: 2, 3: 3, 4: 4 },
+                itemsPerPageLandscape: { 1: 1, 2: 2, 3: 3, 4: 4 }
+            },
+            'LABEL_50x30': { 
+                name: '商品小貼紙', 
+                sizeCss: '50mm 30mm', 
+                widthMm: 50, 
+                heightMm: 30, 
+                aspectRatioPortrait: '50/30', 
+                aspectRatioLandscape: '30/50', 
+                defaultColsPortrait: 1, 
+                defaultColsLandscape: 1,
+                itemsPerPagePortrait: { 1: 1, 2: 2, 3: 3, 4: 4 },
+                itemsPerPageLandscape: { 1: 1, 2: 2, 3: 3, 4: 4 }
+            },
+            'CUSTOM': { 
+                name: '自訂長寬規格', 
+                sizeCss: 'auto', 
+                widthMm: 210, 
+                heightMm: 297, 
+                aspectRatioPortrait: 'auto', 
+                aspectRatioLandscape: 'auto', 
+                defaultColsPortrait: 2, 
+                defaultColsLandscape: 3,
+                itemsPerPagePortrait: { 1: 8, 2: 16, 3: 24, 4: 32 },
+                itemsPerPageLandscape: { 1: 6, 2: 12, 3: 18, 4: 24 }
+            }
         };
 
         // 全域狀態變數
@@ -606,6 +728,7 @@
         let currentBarcodeType = 'EAN13';
         let outputDimension = '1D';
         let currentPaperKey = 'A4';
+        let paperOrientation = 'portrait'; // portrait | landscape
         let activePageIdx = 0;
         let videoStream = null;
         let scanAnimationFrame = null;
@@ -809,34 +932,76 @@
             return baseHeight;
         }
 
+        // 套用預設紙張規格與動態方向，並更新自動欄數排版
         function applyPaperPreset(presetKey) {
             currentPaperKey = presetKey;
             const paperInfo = PAPER_PRESETS[presetKey] || PAPER_PRESETS['A4'];
 
             const printStyleEl = document.getElementById('pagePrintStyle');
+            let sizeCssVal = paperInfo.sizeCss;
+            
+            if (sizeCssVal === 'A4') {
+                sizeCssVal = `A4 ${paperOrientation}`;
+            } else if (sizeCssVal !== 'auto') {
+                sizeCssVal = `${paperInfo.sizeCss} ${paperOrientation}`;
+            }
+
             printStyleEl.innerHTML = `
                 @page {
-                    size: ${paperInfo.sizeCss};
+                    size: ${sizeCssVal};
                     margin: 0;
                 }
             `;
 
-            const paperHintEl = document.getElementById('paperDimHintText');
-            paperHintEl.textContent = `規格：${paperInfo.name} (${paperInfo.widthMm} × ${paperInfo.heightMm} mm)`;
+            const w = paperOrientation === 'portrait' ? paperInfo.widthMm : paperInfo.heightMm;
+            const h = paperOrientation === 'portrait' ? paperInfo.heightMm : paperInfo.widthMm;
 
-            if (document.getElementById('printColsSelect').dataset.autoSwitched !== 'false') {
-                document.getElementById('printColsSelect').value = paperInfo.defaultCols;
+            const paperHintEl = document.getElementById('paperDimHintText');
+            paperHintEl.textContent = `規格：${paperInfo.name} (${w} × ${h} mm, ${paperOrientation === 'portrait' ? '直向' : '橫向'})`;
+
+            const isAutoLayout = document.getElementById('autoLayoutCheckbox').checked;
+            if (isAutoLayout) {
+                const targetCols = paperOrientation === 'portrait' ? paperInfo.defaultColsPortrait : paperInfo.defaultColsLandscape;
+                document.getElementById('printColsSelect').value = targetCols;
             }
         }
 
+        function setPaperOrientation(orientation) {
+            paperOrientation = orientation;
+            const pBtn = document.getElementById('orientPortraitBtn');
+            const lBtn = document.getElementById('orientLandscapeBtn');
+
+            if (orientation === 'portrait') {
+                pBtn.className = "px-2 py-1 rounded text-[11px] font-bold bg-white text-blue-700 shadow-sm transition";
+                lBtn.className = "px-2 py-1 rounded text-[11px] font-bold text-slate-600 hover:text-slate-900 transition";
+            } else {
+                lBtn.className = "px-2 py-1 rounded text-[11px] font-bold bg-white text-blue-700 shadow-sm transition";
+                pBtn.className = "px-2 py-1 rounded text-[11px] font-bold text-slate-600 hover:text-slate-900 transition";
+            }
+
+            applyPaperPreset(currentPaperKey);
+            activePageIdx = 0; // 重算時重置至第一頁
+            renderAll();
+        }
+
+        function getSelectedExportFormat() {
+            const fmt = document.getElementById('exportImageFormatSelect').value;
+            if (fmt === 'jpeg') return { mime: 'image/jpeg', ext: 'jpg' };
+            if (fmt === 'webp') return { mime: 'image/webp', ext: 'webp' };
+            return { mime: 'image/png', ext: 'png' };
+        }
+
+        // 下載單張圖片
         function downloadSingleCardPng(svgOrQrId, code) {
             const elem = document.getElementById(svgOrQrId);
             if (!elem) return;
 
+            const formatInfo = getSelectedExportFormat();
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
-            canvas.width = 400;
-            canvas.height = 200;
+            canvas.width = 500;
+            canvas.height = 250;
+
             ctx.fillStyle = '#ffffff';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -846,10 +1011,10 @@
                 const url = URL.createObjectURL(svgBlob);
                 const img = new Image();
                 img.onload = () => {
-                    ctx.drawImage(img, 20, 20, 360, 160);
+                    ctx.drawImage(img, 20, 20, 460, 210);
                     const a = document.createElement('a');
-                    a.href = canvas.toDataURL('image/png');
-                    a.download = `Barcode_${code}.png`;
+                    a.href = canvas.toDataURL(formatInfo.mime, 0.95);
+                    a.download = `Barcode_${code}.${formatInfo.ext}`;
                     a.click();
                     URL.revokeObjectURL(url);
                 };
@@ -857,13 +1022,31 @@
             } else {
                 const qrImage = elem.querySelector('img') || elem.querySelector('canvas');
                 if (qrImage) {
-                    ctx.drawImage(qrImage, 100, 10, 200, 200);
+                    ctx.drawImage(qrImage, 125, 10, 250, 250);
                     const a = document.createElement('a');
-                    a.href = canvas.toDataURL('image/png');
-                    a.download = `QRCode_${code}.png`;
+                    a.href = canvas.toDataURL(formatInfo.mime, 0.95);
+                    a.download = `QRCode_${code}.${formatInfo.ext}`;
                     a.click();
                 }
             }
+        }
+
+        // 列印單一條碼功能（去除非相關元素）
+        function printSingleBarcode(cardId, pageSheetId) {
+            const cardEl = document.getElementById(cardId);
+            const sheetEl = document.getElementById(pageSheetId);
+            if (!cardEl || !sheetEl) return;
+
+            document.body.classList.add('print-single-mode');
+            sheetEl.classList.add('target-single-sheet');
+            cardEl.classList.add('target-single-card');
+
+            setTimeout(() => {
+                window.print();
+                document.body.classList.remove('print-single-mode');
+                sheetEl.classList.remove('target-single-sheet');
+                cardEl.classList.remove('target-single-card');
+            }, 100);
         }
 
         function copyCodeToClipboard(codeText) {
@@ -889,6 +1072,14 @@
                 noteControlsArea.classList.add('opacity-40', 'pointer-events-none');
             }
 
+            const isAutoLayout = document.getElementById('autoLayoutCheckbox').checked;
+            const printColsSelect = document.getElementById('printColsSelect');
+            if (isAutoLayout) {
+                printColsSelect.disabled = true;
+            } else {
+                printColsSelect.disabled = false;
+            }
+
             const isAutoHeight = document.getElementById('autoHeightCheckbox').checked;
             const barHeightInput = document.getElementById('barHeight');
             if (isAutoHeight) {
@@ -905,12 +1096,20 @@
             }
         }
 
-        // 渲染主畫布：包含預覽與輸出
+        // 渲染主畫布：包含預覽與純淨輸出
         function renderAll() {
             updateUIControlsState();
 
-            const isAutoHeight = document.getElementById('autoHeightCheckbox').checked;
+            const isAutoLayout = document.getElementById('autoLayoutCheckbox').checked;
+            const paperInfo = PAPER_PRESETS[currentPaperKey] || PAPER_PRESETS['A4'];
+
+            if (isAutoLayout) {
+                const autoCols = paperOrientation === 'portrait' ? paperInfo.defaultColsPortrait : paperInfo.defaultColsLandscape;
+                document.getElementById('printColsSelect').value = autoCols;
+            }
+
             const printCols = parseInt(document.getElementById('printColsSelect').value, 10) || 3;
+            const isAutoHeight = document.getElementById('autoHeightCheckbox').checked;
             const barHeightInput = document.getElementById('barHeight');
 
             let calculatedHeight = 70;
@@ -938,8 +1137,8 @@
                 return;
             }
 
-            const paperInfo = PAPER_PRESETS[currentPaperKey] || PAPER_PRESETS['A4'];
-            const pageSizeLimit = paperInfo.itemsPerPage[printCols] || 24;
+            const itemsPerPageMap = paperOrientation === 'portrait' ? paperInfo.itemsPerPagePortrait : paperInfo.itemsPerPageLandscape;
+            const pageSizeLimit = itemsPerPageMap[printCols] || 24;
             const totalPages = Math.ceil(items.length / pageSizeLimit);
 
             const pageNavToolbar = document.getElementById('pageNavToolbar');
@@ -962,25 +1161,29 @@
                 const pageItems = items.slice(p * pageSizeLimit, (p + 1) * pageSizeLimit);
                 const totalRowsInPage = Math.ceil(pageItems.length / printCols);
 
+                const sheetId = `sheet-page-${p}`;
                 const sheet = document.createElement('div');
+                sheet.id = sheetId;
                 sheet.className = "paper-sheet p-4 sm:p-5 rounded-lg w-full";
 
-                if (paperInfo.aspectRatio !== 'auto') {
-                    sheet.style.aspectRatio = paperInfo.aspectRatio;
+                const targetRatio = paperOrientation === 'portrait' ? paperInfo.aspectRatioPortrait : paperInfo.aspectRatioLandscape;
+                if (targetRatio !== 'auto') {
+                    sheet.style.aspectRatio = targetRatio;
                 }
 
                 if (currentPaperKey === 'LABEL_50x30' || currentPaperKey === 'LABEL_70x50') {
-                    sheet.style.maxWidth = '340px';
+                    sheet.style.maxWidth = paperOrientation === 'portrait' ? '340px' : '480px';
                 } else if (currentPaperKey === 'LABEL_100x100' || currentPaperKey === 'LABEL_100x150') {
-                    sheet.style.maxWidth = '420px';
+                    sheet.style.maxWidth = paperOrientation === 'portrait' ? '420px' : '580px';
                 } else {
                     sheet.style.maxWidth = '100%';
                 }
 
+                // 頁首資訊標籤 (設有 no-print 與 sheet-header，列印時絕對隱藏)
                 const pageHeader = document.createElement('div');
-                pageHeader.className = "w-full flex justify-between items-center pb-2 mb-3 border-b border-slate-100 text-[10px] text-slate-400 font-mono no-print";
+                pageHeader.className = "sheet-header w-full flex justify-between items-center pb-2 mb-3 border-b border-slate-100 text-[10px] text-slate-400 font-mono no-print";
                 pageHeader.innerHTML = `
-                    <span>📄 SHEET ${p + 1} / ${totalPages} (${paperInfo.name})</span>
+                    <span>📄 SHEET ${p + 1} / ${totalPages} (${paperInfo.name} - ${paperOrientation === 'portrait' ? '直向' : '橫向'})</span>
                     <span>網格：${printCols} 欄 × ${totalRowsInPage} 列 (共 ${pageItems.length} 格)</span>
                 `;
                 sheet.appendChild(pageHeader);
@@ -1001,7 +1204,9 @@
                     const rowIdx = Math.floor(idxWithinPage / printCols) + 1;
                     const colIdx = (idxWithinPage % printCols) + 1;
 
+                    const cardId = `print-card-${globalIdx}`;
                     const card = document.createElement('div');
+                    card.id = cardId;
                     card.className = "print-card p-2 sm:p-3 rounded-lg flex flex-col items-center justify-center relative group min-w-0";
 
                     const notePos = document.getElementById('notePosition').value;
@@ -1011,12 +1216,17 @@
                     if (noteAlign === 'left') alignClass = "text-left";
                     if (noteAlign === 'right') alignClass = "text-right";
 
+                    // 格位標籤號碼 (列印時會被 CSS 隱藏)
                     const cellBadge = `<span class="grid-cell-badge">R${rowIdx}-C${colIdx}</span>`;
 
                     const hoverActions = `
                         <div class="card-hover-actions absolute top-1.5 right-1.5 flex items-center space-x-1 no-print z-10">
+                            <button type="button" onclick="printSingleBarcode('${cardId}', '${sheetId}')" 
+                                class="bg-slate-800 text-white p-1 rounded-md text-[10px] shadow hover:bg-black transition" title="列印此單一條碼">
+                                🖨️
+                            </button>
                             <button type="button" onclick="downloadSingleCardPng('${outputDimension === '1D' ? 'barcode-svg-' + globalIdx : 'qr-container-' + globalIdx}', '${item.code}')" 
-                                class="bg-blue-600 text-white p-1 rounded-md text-[10px] shadow hover:bg-blue-700 transition" title="下載單張 PNG">
+                                class="bg-blue-600 text-white p-1 rounded-md text-[10px] shadow hover:bg-blue-700 transition" title="下載單張圖片">
                                 ⬇️
                             </button>
                             <button type="button" onclick="copyCodeToClipboard('${item.code}')" 
@@ -1026,6 +1236,7 @@
                         </div>
                     `;
 
+                    // 附註文字區塊，列印時將完整保留與顯示
                     if (outputDimension === '1D') {
                         const svgId = `barcode-svg-${globalIdx}`;
                         card.innerHTML = `
@@ -1267,12 +1478,13 @@
             const items = getBatchItemsList();
             if (items.length === 0) return alert('沒有可供匯出的有效條碼！');
 
+            const formatInfo = getSelectedExportFormat();
             const zip = new JSZip();
             const folder = zip.folder("barcodes");
 
             const btn = document.getElementById('downloadBatchZipBtn');
             const originalText = btn.innerHTML;
-            btn.innerHTML = `<span class="animate-spin">⏳</span> 打包處理中...`;
+            btn.innerHTML = `<span class="animate-spin">⏳</span> 打包處理中 (${formatInfo.ext.toUpperCase()})...`;
 
             try {
                 for (let i = 0; i < items.length; i++) {
@@ -1281,8 +1493,8 @@
                     const ctx = canvas.getContext('2d');
 
                     if (outputDimension === '1D') {
-                        canvas.width = 400;
-                        canvas.height = 200;
+                        canvas.width = 500;
+                        canvas.height = 250;
                         ctx.fillStyle = '#ffffff';
                         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -1295,7 +1507,7 @@
                             
                             await new Promise((resolve) => {
                                 img.onload = () => {
-                                    ctx.drawImage(img, 20, 20, 360, 160);
+                                    ctx.drawImage(img, 20, 20, 460, 210);
                                     URL.revokeObjectURL(url);
                                     resolve();
                                 };
@@ -1303,25 +1515,26 @@
                             });
                         }
                     } else {
-                        canvas.width = 240;
-                        canvas.height = 240;
+                        canvas.width = 300;
+                        canvas.height = 300;
                         ctx.fillStyle = '#ffffff';
                         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
                         const qrElem = document.getElementById(`qr-container-${i}`)?.querySelector('img') || document.getElementById(`qr-container-${i}`)?.querySelector('canvas');
                         if (qrElem) {
-                            ctx.drawImage(qrElem, 20, 20, 200, 200);
+                            ctx.drawImage(qrElem, 25, 25, 250, 250);
                         }
                     }
 
-                    const base64Data = canvas.toDataURL('image/png').replace(/^data:image\/png;base64,/, "");
-                    folder.file(`${item.code}_${i + 1}.png`, base64Data, { base64: true });
+                    const dataUrl = canvas.toDataURL(formatInfo.mime, 0.95);
+                    const base64Data = dataUrl.replace(new RegExp(`^data:${formatInfo.mime.replace('/', '\\/')};base64,`), "");
+                    folder.file(`${item.code}_${i + 1}.${formatInfo.ext}`, base64Data, { base64: true });
                 }
 
                 const content = await zip.generateAsync({ type: "blob" });
                 const a = document.createElement('a');
                 a.href = URL.createObjectURL(content);
-                a.download = `Batch_Barcodes_${Date.now()}.zip`;
+                a.download = `Batch_Barcodes_${formatInfo.ext.toUpperCase()}_${Date.now()}.zip`;
                 a.click();
             } catch (err) {
                 console.error(err);
@@ -1358,7 +1571,6 @@
             document.getElementById('batchCountBadge').textContent = `共 ${items.length} 筆資料`;
         }
 
-        // 單張同步至批量模式
         function syncSingleToBatch() {
             const singleCode = document.getElementById('barcodeInput').value.trim();
             const singleNote = document.getElementById('noteInput').value.trim();
@@ -1381,7 +1593,6 @@
             updateBatchCount();
         }
 
-        // 批量同步至單張模式 (讀取第一筆)
         function syncBatchToSingle() {
             const textarea = document.getElementById('batchTextarea');
             const lines = textarea.value.split('\n').map(l => l.trim()).filter(Boolean);
@@ -1401,7 +1612,6 @@
             }
         }
 
-        // 切換模式按鈕事件
         document.getElementById('modeSingleBtn').addEventListener('click', () => {
             syncBatchToSingle();
             appMode = 'single';
@@ -1460,15 +1670,19 @@
             renderAll();
         });
 
+        document.getElementById('orientPortraitBtn').addEventListener('click', () => setPaperOrientation('portrait'));
+        document.getElementById('orientLandscapeBtn').addEventListener('click', () => setPaperOrientation('landscape'));
+
         document.getElementById('paperPresetSelect').addEventListener('change', (e) => {
             applyPaperPreset(e.target.value);
             renderAll();
         });
 
         document.getElementById('printColsSelect').addEventListener('change', () => {
-            document.getElementById('printColsSelect').dataset.autoSwitched = 'false';
             renderAll();
         });
+
+        document.getElementById('autoLayoutCheckbox').addEventListener('change', renderAll);
 
         document.getElementById('prevPageBtn').addEventListener('click', () => {
             if (activePageIdx > 0) {
@@ -1532,7 +1746,7 @@
             renderAll();
         });
 
-        // 觸發列印，自動展頁並驅動預覽畫布對齊列印/輸出
+        // 觸發整頁標籤列印
         document.getElementById('printLabelsBtn').addEventListener('click', () => {
             const checkbox = document.getElementById('showAllPagesCheckbox');
             const wasChecked = checkbox.checked;
