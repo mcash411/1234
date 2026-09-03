@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>一維與二維條碼批量產生器與掃描器 (畫布原樣輸出版)</title>
+    <title>一維與二維條碼批量產生器與掃描器 (雙向模式同步版)</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- QRCode.js -->
@@ -40,7 +40,6 @@
                 margin: 0 !important;
             }
 
-            /* 隱藏左側與右側控制欄，僅保留預覽畫布卡片 */
             section {
                 display: none !important;
             }
@@ -228,7 +227,7 @@
                 </div>
                 <div>
                     <h1 class="text-lg font-bold tracking-wide leading-tight">條碼批量產生與列印系統</h1>
-                    <p class="text-[10px] text-slate-400">支援單張/批量條碼、紙張邊界自動調整、POS QR 數量與畫布 100% 原樣列印</p>
+                    <p class="text-[10px] text-slate-400">支援單張/批量條碼雙向同步、紙張邊界自動調整、POS QR 數量與畫布 100% 原樣列印</p>
                 </div>
             </div>
             
@@ -513,9 +512,9 @@
             <!-- 操作說明 -->
             <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200/80 text-xs text-slate-600 space-y-1 no-print">
                 <p class="font-bold text-slate-800 flex items-center space-x-1">
-                    <span>💡 畫布 100% 原樣列印輸出說明：</span>
+                    <span>💡 雙向模式同步說明：</span>
                 </p>
-                <p>點擊「列印 / 輸出 PDF 標籤頁」按鈕後，系統會自動隱藏選單面板，並精準複製與放大畫布內容進行滿版輸出。</p>
+                <p>切換「單張」與「批量」模式時，系統會自動同步您填寫的條碼內容、附註品名與交易數量，無須重複輸入！</p>
             </div>
         </section>
     </main>
@@ -1358,7 +1357,53 @@
             document.getElementById('batchCountBadge').textContent = `共 ${items.length} 筆資料`;
         }
 
+        // 單張同步至批量模式
+        function syncSingleToBatch() {
+            const singleCode = document.getElementById('barcodeInput').value.trim();
+            const singleNote = document.getElementById('noteInput').value.trim();
+            const singleQty = document.getElementById('posQuantityInput').value.trim() || '1';
+
+            if (!singleCode) return;
+
+            const newEntry = `${singleCode},${singleNote},${singleQty}`;
+            const textarea = document.getElementById('batchTextarea');
+            const lines = textarea.value.split('\n').map(l => l.trim()).filter(Boolean);
+
+            // 檢查清單是否已包含該條碼，避免重覆追加，若無則加入
+            const isExist = lines.some(line => line.startsWith(singleCode));
+            if (!isExist) {
+                if (lines.length === 0) {
+                    textarea.value = newEntry;
+                } else {
+                    textarea.value = `${newEntry}\n${lines.join('\n')}`;
+                }
+            }
+            updateBatchCount();
+        }
+
+        // 批量同步至單張模式 (讀取第一筆)
+        function syncBatchToSingle() {
+            const textarea = document.getElementById('batchTextarea');
+            const lines = textarea.value.split('\n').map(l => l.trim()).filter(Boolean);
+
+            if (lines.length > 0) {
+                const parts = lines[0].split(/[,;\t]/);
+                if (parts[0]) {
+                    document.getElementById('barcodeInput').value = parts[0];
+                    if (parts[1]) document.getElementById('noteInput').value = parts[1];
+                    if (parts[2]) document.getElementById('posQuantityInput').value = parts[2];
+
+                    const digits = parts[0].replace(/\D/g, '');
+                    if (digits.length === 13) setBarcodeType('EAN13');
+                    else if (digits.length === 8) setBarcodeType('EAN8');
+                    else setBarcodeType('CODE128');
+                }
+            }
+        }
+
+        // 切換模式按鈕事件
         document.getElementById('modeSingleBtn').addEventListener('click', () => {
+            syncBatchToSingle(); // 從批量切回單張時同步第一筆資料
             appMode = 'single';
             document.getElementById('modeSingleBtn').className = "px-3.5 py-1.5 rounded-lg text-xs font-bold bg-blue-600 text-white shadow";
             document.getElementById('modeBatchBtn').className = "px-3.5 py-1.5 rounded-lg text-xs font-bold text-slate-400 hover:text-white";
@@ -1368,6 +1413,7 @@
         });
 
         document.getElementById('modeBatchBtn').addEventListener('click', () => {
+            syncSingleToBatch(); // 切換至批量模式時自動同步單張數據
             appMode = 'batch';
             document.getElementById('modeBatchBtn').className = "px-3.5 py-1.5 rounded-lg text-xs font-bold bg-blue-600 text-white shadow";
             document.getElementById('modeSingleBtn').className = "px-3.5 py-1.5 rounded-lg text-xs font-bold text-slate-400 hover:text-white";
