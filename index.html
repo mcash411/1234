@@ -3,1769 +3,1683 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>一維與二維條碼批量產生器與掃描器 (純淨標籤排版列印版)</title>
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- QRCode.js -->
+    <title>商品條碼批量輸出與獨立編輯系統</title>
+    <!-- 載入條碼與 QR Code 繪製套件 CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-    <!-- JSZip 批次打包工具 -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-    <!-- ZXing 掃描引擎 -->
-    <script src="https://unpkg.com/@zxing/library@latest/umd/index.min.js"></script>
-    <style id="pagePrintStyle">
-        /* 動態寫入紙張列印頁面尺寸與方向 */
-        @page {
-            size: A4 portrait;
+    <script src="https://unpkg.com/@zxing/library@latest"></script>
+    <!-- 載入 html2canvas (用於將標籤轉為圖片下載) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        :root {
+            --primary-green: #00805a;
+            --primary-red: #e31837;
+            --primary-orange: #f58220;
+            --bg-color: #f1f5f9;
+            --card-bg: #ffffff;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: var(--bg-color);
             margin: 0;
+            padding: 16px;
+            color: #1e293b;
         }
 
-        /* 列印模式：完全隱藏網頁 UI 雜項，僅保留「條碼 + 商品品名/附註」 */
-        @media print {
-            /* 隱藏 UI 控制面板、頁首、Modal、格位編號與畫布外圍裝飾 */
-            .no-print, header, footer, #cameraModal, #pageNavToolbar, .card-hover-actions, .grid-cell-badge, .sheet-header { 
-                display: none !important; 
-            }
-
-            body { 
-                background: #ffffff !important; 
-                padding: 0 !important; 
-                margin: 0 !important; 
-                overflow: visible !important;
-            }
-
-            main {
-                display: block !important;
-                max-width: 100% !important;
-                padding: 0 !important;
-                margin: 0 !important;
-            }
-
-            /* 隱藏左側與右側操控選單面板 */
-            section {
-                display: none !important;
-            }
-
-            /* 僅保留預覽畫布區域並滿版列印 */
-            #previewCardSection {
-                display: block !important;
-                width: 100% !important;
-                max-width: 100% !important;
-                margin: 0 !important;
-                padding: 0 !important;
-            }
-
-            #previewCard {
-                border: none !important;
-                box-shadow: none !important;
-                padding: 0 !important;
-                margin: 0 !important;
-                background: transparent !important;
-            }
-
-            #galleryContainer {
-                background: #ffffff !important;
-                border: none !important;
-                padding: 0 !important;
-                margin: 0 !important;
-                max-height: none !important;
-                overflow: visible !important;
-                box-shadow: none !important;
-            }
-
-            /* 紙張分頁與邊界精準輸出 */
-            .paper-sheet {
-                box-shadow: none !important;
-                border: none !important;
-                padding: 4mm !important;
-                margin: 0 auto !important;
-                width: 100% !important;
-                max-width: 100% !important;
-                aspect-ratio: auto !important;
-                page-break-after: always !important;
-                break-after: page !important;
-                background: #ffffff !important;
-            }
-
-            .paper-sheet:last-child {
-                page-break-after: auto !important;
-                break-after: auto !important;
-            }
-
-            .paper-margin-guide {
-                border: none !important;
-                padding: 0 !important;
-                height: auto !important;
-            }
-
-            .print-grid {
-                display: grid !important;
-                grid-template-columns: repeat(var(--print-cols, 3), minmax(0, 1fr)) !important;
-                gap: 6px !important;
-                width: 100% !important;
-            }
-
-            .print-card {
-                page-break-inside: avoid !important;
-                break-inside: avoid !important;
-                border: 1px solid #000000 !important;
-                box-shadow: none !important;
-                padding: 4px !important;
-                background: #ffffff !important;
-            }
-
-            /* 單一條碼列印模式時的無干擾獨立輸出 */
-            body.print-single-mode .paper-sheet {
-                display: none !important;
-            }
-
-            body.print-single-mode .paper-sheet.target-single-sheet {
-                display: block !important;
-                page-break-after: auto !important;
-                break-after: auto !important;
-            }
-
-            body.print-single-mode .print-card {
-                display: none !important;
-            }
-
-            body.print-single-mode .print-card.target-single-card {
-                display: flex !important;
-                width: 100% !important;
-                max-width: 80mm !important;
-                margin: 0 auto !important;
-                border: 1px solid #000000 !important;
-            }
+        .no-print {
+            max-width: 960px;
+            margin: 0 auto 20px auto;
         }
-        
-        /* 雷射掃描對焦動畫 */
-        .scanner-container {
+
+        .app-card {
+            background-color: var(--card-bg);
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .header {
+            text-align: center;
+            padding-bottom: 12px;
+            border-bottom: 3px solid var(--primary-green);
+            margin-bottom: 16px;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 22px;
+            color: #0f172a;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .badge {
+            background-color: var(--primary-red);
+            color: white;
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 12px;
+        }
+
+        /* 工具箱按鈕列 */
+        .tools-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .tools-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        .btn-tool {
+            padding: 10px;
+            border: 1px solid var(--primary-green);
+            background-color: #f0fdf4;
+            color: var(--primary-green);
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            transition: all 0.2s;
+        }
+
+        .btn-tool:hover {
+            background-color: var(--primary-green);
+            color: #fff;
+        }
+
+        /* 可折疊隱藏進階工具列 */
+        .collapsible-tools {
+            display: none;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 8px;
+            margin-top: 8px;
+            width: 100%;
+        }
+
+        .btn-toggle-tools {
+            background: none;
+            border: none;
+            color: #0284c7;
+            font-size: 12px;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+
+        .btn-toggle-tools:hover {
+            background-color: #e0f2fe;
+        }
+
+        /* 鏡頭自動辨識預覽容器 */
+        #scanner-container {
+            display: none;
             position: relative;
+            width: 100%;
+            margin-bottom: 16px;
+            border-radius: 12px;
+            overflow: hidden;
+            background: #000;
+            border: 3px solid var(--primary-green);
+        }
+
+        #video {
+            width: 100%;
+            height: 320px;
+            object-fit: cover;
+            display: block;
+        }
+
+        .scan-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-end;
+            padding: 12px;
+        }
+
+        .scan-status-tag {
+            background: rgba(0, 128, 90, 0.92);
+            color: #ffffff;
+            font-size: 12px;
+            padding: 5px 16px;
+            border-radius: 16px;
+            font-weight: bold;
+            letter-spacing: 0.5px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+            backdrop-filter: blur(4px);
+        }
+
+        .flash-effect {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(255, 255, 255, 0.85);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.12s ease-out;
+            z-index: 15;
+        }
+
+        .close-scanner {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: rgba(0,0,0,0.65);
+            color: #fff;
+            border: none;
+            border-radius: 50%;
+            width: 32px;
+            height: 32px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 16px;
+            z-index: 12;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* 感應靈敏度調整選單 */
+        .sensitivity-bar-top {
+            position: absolute;
+            top: 8px;
+            left: 12px;
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(4px);
+            padding: 4px 12px;
+            border-radius: 20px;
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            gap: 8px;
+            z-index: 11;
+        }
+
+        .sensitivity-title {
+            color: #ffffff;
+            font-size: 11px;
+            font-weight: bold;
+            white-space: nowrap;
+        }
+
+        .btn-sens-group {
+            display: flex;
+            flex-direction: row;
+            gap: 4px;
+        }
+
+        .btn-sens {
+            background: transparent;
+            border: 1px solid rgba(255,255,255,0.4);
+            color: #ffffff;
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.15s;
+            white-space: nowrap;
+        }
+
+        .btn-sens.active {
+            background-color: var(--primary-green);
+            border-color: var(--primary-green);
+            font-weight: bold;
+        }
+
+        .section-title {
+            font-size: 14px;
+            font-weight: bold;
+            color: #334155;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* 獨立商品修改控制區塊 */
+        .editor-card {
+            background-color: #f0fdf4;
+            border: 2px solid var(--primary-green);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+
+        .editor-header {
+            font-size: 13px;
+            font-weight: bold;
+            color: var(--primary-green);
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .editor-row {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .form-group.flex-2 { flex: 2; min-width: 160px; }
+        .form-group.flex-3 { flex: 3; min-width: 200px; }
+        .form-group.flex-1 { flex: 1; min-width: 80px; }
+
+        .form-group label {
+            font-size: 12px;
+            font-weight: bold;
+            color: #475569;
+        }
+
+        /* 批量清單展示 */
+        .items-list-wrapper {
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            background: #fff;
+            margin-bottom: 12px;
+        }
+
+        .item-list-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 12px;
+            border-bottom: 1px solid #f1f5f9;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+
+        .item-list-row:hover {
+            background-color: #f8fafc;
+        }
+
+        .item-list-row.active {
+            background-color: #e6f2ed;
+            border-left: 4px solid var(--primary-green);
+        }
+
+        .item-info {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            font-size: 13px;
+        }
+
+        .item-note-text {
+            font-weight: bold;
+            color: #0f172a;
+            min-width: 100px;
+        }
+
+        .item-barcode-text {
+            color: #475569;
+            font-family: monospace;
+        }
+
+        .item-format-badge {
+            font-size: 10px;
+            background-color: #dbeafe;
+            color: #1e40af;
+            padding: 1px 6px;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+
+        .item-qty-badge {
+            background: #e2e8f0;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: bold;
+            color: #334155;
+        }
+
+        /* 按鈕列樣式 */
+        .layout-controls-container {
+            background-color: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 14px;
+            margin-bottom: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .control-block {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .control-block label {
+            font-size: 12px;
+            font-weight: bold;
+            color: #475569;
+        }
+
+        .btn-toggle-group {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .btn-toggle {
+            flex: 1;
+            min-width: 70px;
+            padding: 8px 10px;
+            font-size: 12px;
+            font-weight: 600;
+            border: 1px solid #cbd5e1;
+            background: #ffffff;
+            color: #475569;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.15s ease-in-out;
+            text-align: center;
+        }
+
+        .btn-toggle:hover {
+            border-color: var(--primary-green);
+            color: var(--primary-green);
+        }
+
+        .btn-toggle.active {
+            background-color: var(--primary-green);
+            color: #ffffff;
+            border-color: var(--primary-green);
+            box-shadow: 0 2px 4px rgba(0, 128, 90, 0.2);
+        }
+
+        input[type="text"], input[type="number"], textarea {
+            width: 100%;
+            padding: 8px 10px;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            font-size: 13px;
+            background-color: #fff;
+        }
+
+        textarea {
+            height: 75px;
+            font-family: monospace;
+            font-size: 12px;
+            resize: vertical;
+        }
+
+        .btn-del {
+            background: #fee2e2;
+            color: var(--primary-red);
+            border: none;
+            border-radius: 6px;
+            padding: 4px 8px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .btn-del:hover {
+            background: #fca5a5;
+        }
+
+        .action-btns {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 10px 14px;
+            border: 1px solid #cbd5e1;
+            background: white;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+        }
+
+        .btn-primary {
+            background-color: var(--primary-green);
+            color: white;
+            border: none;
+        }
+
+        .btn-primary:hover {
+            background-color: #006648;
+        }
+
+        .btn-save {
+            background-color: #0284c7;
+            color: white;
+            border: none;
+        }
+
+        .btn-save:hover {
+            background-color: #0369a1;
+        }
+
+        .btn-print {
+            background-color: var(--primary-orange);
+            color: white;
+            border: none;
+        }
+
+        .btn-print:hover {
+            background-color: #d96d13;
+        }
+
+        .status-msg {
+            font-size: 12px;
+            color: var(--primary-green);
+            text-align: center;
+            margin-bottom: 8px;
+            display: none;
+            background-color: #e6f2ed;
+            padding: 6px;
+            border-radius: 6px;
+        }
+
+        #fileInput {
+            display: none;
+        }
+
+        /* 輸出與排版區域 */
+        .print-layout-container {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+            max-width: 960px;
+            margin: 0 auto;
+        }
+
+        .barcode-grid {
+            display: grid;
+            gap: 12px;
+            width: 100%;
+        }
+
+        .grid-cols-1 { grid-template-columns: repeat(1, 1fr); }
+        .grid-cols-2 { grid-template-columns: repeat(2, 1fr); }
+        .grid-cols-3 { grid-template-columns: repeat(3, 1fr); }
+        .grid-cols-4 { grid-template-columns: repeat(4, 1fr); }
+
+        .barcode-card {
+            border: 1px dashed #cbd5e1;
+            border-radius: 6px;
+            padding: 8px 10px;
+            background: #ffffff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            position: relative;
+            box-sizing: border-box;
+            page-break-inside: avoid;
+            break-inside: avoid;
+            overflow: hidden;
+            min-height: 80px;
+        }
+
+        .download-single-btn {
+            position: absolute;
+            bottom: 4px;
+            right: 4px;
+            background: rgba(0, 0, 0, 0.05);
+            color: #475569;
+            border: 1px solid #cbd5e1;
+            border-radius: 4px;
+            font-size: 10px;
+            padding: 2px 6px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .download-single-btn:hover {
+            background: var(--primary-green);
+            color: #ffffff;
+            border-color: var(--primary-green);
+        }
+
+        .barcode-note-container {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 4px;
+            min-height: 22px;
             overflow: hidden;
         }
-        .scanner-laser {
-            position: absolute;
-            top: 10%;
-            left: 5%;
-            right: 5%;
-            height: 2px;
-            background: #10b981;
-            box-shadow: 0 0 12px #10b981, 0 0 6px #10b981;
-            animation: scan 2s infinite ease-in-out;
-            z-index: 10;
-        }
-        @keyframes scan {
-            0%, 100% { top: 12%; }
-            50% { top: 88%; }
-        }
 
-        /* 鏡頭四角對焦框 */
-        .focus-box {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 75%;
-            height: 65%;
-            border: 2px solid rgba(255, 255, 255, 0.3);
-            border-radius: 12px;
-            pointer-events: none;
-            z-index: 5;
-        }
-        .focus-corner {
-            position: absolute;
-            width: 18px;
-            height: 18px;
-            border-color: #10b981;
-            border-style: solid;
-        }
-        .corner-tl { top: -2px; left: -2px; border-width: 3px 0 0 3px; border-top-left-radius: 8px; }
-        .corner-tr { top: -2px; right: -2px; border-width: 3px 3px 0 0; border-top-right-radius: 8px; }
-        .corner-bl { bottom: -2px; left: -2px; border-width: 0 0 3px 3px; border-bottom-left-radius: 8px; }
-        .corner-br { bottom: -2px; right: -2px; border-width: 0 3px 3px 0; border-bottom-right-radius: 8px; }
-
-        .checkerboard-bg {
-            background-color: #f1f5f9;
-            background-image: linear-gradient(45deg, #cbd5e1 25%, transparent 25%), linear-gradient(-45deg, #cbd5e1 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #cbd5e1 75%), linear-gradient(-45deg, transparent 75%, #cbd5e1 75%);
-            background-size: 16px 16px;
-            background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
-        }
-
-        /* 擬真分頁紙張樣式 */
-        .paper-sheet {
-            background: #ffffff;
-            box-shadow: 0 12px 28px -4px rgba(15, 23, 42, 0.12), 0 8px 12px -6px rgba(15, 23, 42, 0.08), 0 0 0 1px rgba(15, 23, 42, 0.06);
-            transition: all 0.3s ease;
-            margin: 0 auto 24px auto;
-            position: relative;
-        }
-
-        /* 可列印邊界導引虛線 */
-        .paper-margin-guide {
-            border: 1px dashed #94a3b8;
-            border-radius: 6px;
-            height: 100%;
-        }
-
-        /* 行列對齊網格卡片 */
-        .print-card {
-            transition: all 0.2s ease;
-            box-sizing: border-box;
-            background-color: #ffffff;
-            border: 1px solid #cbd5e1;
-        }
-        .print-card:hover {
-            border-color: #2563eb;
-            box-shadow: 0 4px 12px -1px rgba(37, 99, 235, 0.2);
-            z-index: 5;
-        }
-        .print-card:hover .card-hover-actions {
-            opacity: 1;
-        }
-        .card-hover-actions {
-            opacity: 0;
-            transition: opacity 0.2s ease;
-        }
-
-        .grid-cell-badge {
-            position: absolute;
-            top: 4px;
-            left: 6px;
-            font-size: 9px;
-            font-family: monospace;
-            color: #94a3b8;
+        .barcode-note-text {
             font-weight: bold;
-            pointer-events: none;
-            user-select: none;
+            color: #0f172a;
+            white-space: nowrap;
+            display: inline-block;
+            line-height: 1.2;
+        }
+
+        .barcode-content-stacked {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            width: 100%;
+        }
+
+        .barcode-svg {
+            max-width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        .qr-canvas-box {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 2px;
+            min-height: 50px;
+        }
+
+        .qr-canvas-box canvas, .qr-canvas-box img {
+            display: block !important;
+            margin: 0 auto;
+        }
+
+        @media print {
+            body {
+                background-color: white;
+                padding: 0;
+                margin: 0;
+            }
+            .no-print, .download-single-btn {
+                display: none !important;
+            }
+            .print-layout-container {
+                box-shadow: none;
+                padding: 0;
+                max-width: 100%;
+            }
+            .barcode-card {
+                border: 1px solid #000 !important;
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+            }
         }
     </style>
 </head>
-<body class="bg-slate-100 min-h-screen font-sans text-slate-800 antialiased pb-12">
+<body>
 
-    <!-- Header -->
-    <header class="bg-slate-900 text-white shadow-lg sticky top-0 z-40 no-print backdrop-blur-md bg-slate-900/90">
-        <div class="max-w-7xl mx-auto px-4 py-3.5 flex flex-wrap items-center justify-between gap-3">
-            <div class="flex items-center space-x-3">
-                <div class="bg-blue-600 p-2 rounded-xl text-white shadow-md">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-                    </svg>
-                </div>
-                <div>
-                    <h1 class="text-lg font-bold tracking-wide leading-tight">條碼批量產生與列印系統</h1>
-                    <p class="text-[10px] text-slate-400">保留條碼與商品品名、支援自動與手動排版設定、純淨標籤列印</p>
-                </div>
-            </div>
-            
-            <!-- 工作模式切換 -->
-            <div class="bg-slate-800 p-1 rounded-xl border border-slate-700 flex space-x-1 shadow-inner">
-                <button type="button" id="modeSingleBtn" class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all duration-200 bg-blue-600 text-white shadow">
-                    🎯 單張產生模式
-                </button>
-                <button type="button" id="modeBatchBtn" class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all duration-200 text-slate-400 hover:text-white">
-                    📦 批量產生模式
-                </button>
-            </div>
+<div class="no-print">
+    <div class="app-card">
+        <div class="header">
+            <h1>商品條碼批量輸出與獨立編輯系統 <span class="badge">通用版</span></h1>
         </div>
-    </header>
 
-    <main class="max-w-7xl mx-auto px-4 py-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
-        
-        <!-- 左側：設定控制台與即時預覽畫布 -->
-        <section id="previewCardSection" class="lg:col-span-6 space-y-6">
-            
-            <!-- 條碼參數設定區 (列印時自動隱藏) -->
-            <div id="typeConfigPanel" class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200/80 no-print space-y-5">
-                <div class="flex justify-between items-center border-b border-slate-100 pb-3">
-                    <h2 id="sectionTitle" class="text-base font-bold text-slate-900 flex items-center space-x-2">
-                        <span>條碼格式與類型</span>
-                    </h2>
-                    <span id="scanStatusBadge" class="text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200/80 px-2.5 py-0.5 rounded-full font-medium flex items-center space-x-1">
-                        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                        <span id="scanBadgeText">系統待命</span>
-                    </span>
-                </div>
-
-                <!-- 條碼碼制選擇 -->
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">條碼類型 (Barcode Standard)</label>
-                    <div class="grid grid-cols-3 gap-2">
-                        <button type="button" id="typeEan13Btn" class="py-2 px-1 text-xs font-bold rounded-xl border border-blue-600 bg-blue-600 text-white shadow-sm transition-all text-center">EAN-13</button>
-                        <button type="button" id="typeEan8Btn" class="py-2 px-1 text-xs font-bold rounded-xl border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100 transition-all text-center">EAN-8</button>
-                        <button type="button" id="typeCode128Btn" class="py-2 px-1 text-xs font-bold rounded-xl border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100 transition-all text-center">Code 128</button>
-                    </div>
-                </div>
-
-                <!-- 碼制模式：一維 vs 二維 -->
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">輸出維度</label>
-                    <div class="grid grid-cols-2 gap-2">
-                        <button type="button" id="dimension1DBtn" class="py-1.5 px-2 text-xs font-bold rounded-lg border border-slate-300 bg-slate-100 text-slate-800 text-center">一維標準條碼</button>
-                        <button type="button" id="dimension2DBtn" class="py-1.5 px-2 text-xs font-bold rounded-lg border border-slate-200 bg-slate-50 text-slate-500 text-center">二維 POS QR Code</button>
-                    </div>
-                </div>
-
-                <!-- 單張輸入區 -->
-                <div id="singleInputArea" class="space-y-3">
-                    <div class="flex justify-between items-center mb-1">
-                        <label for="barcodeInput" id="inputLabel" class="text-xs font-semibold text-slate-600">條碼內容</label>
-                        <span id="digitCount" class="text-xs text-slate-400 font-mono">12/13</span>
-                    </div>
-                    <div class="relative">
-                        <input type="text" id="barcodeInput" maxlength="13" placeholder="例如：471123456789" value="471123456789"
-                            class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition font-mono text-base font-medium">
-                    </div>
-
-                    <!-- 僅在二維 POS 模式顯示：商品交易數量 (Quantity) -->
-                    <div id="posQuantityContainer" class="p-3 bg-blue-50/60 rounded-xl border border-blue-100 space-y-1.5 hidden">
-                        <div class="flex justify-between items-center">
-                            <label for="posQuantityInput" class="text-xs font-bold text-blue-900">
-                                POS 交易數量 (Quantity)
-                            </label>
-                            <span class="text-[10px] text-blue-600 font-medium">寫入 JSON 商品內碼</span>
-                        </div>
-                        <div class="flex items-center space-x-2">
-                            <button type="button" id="decQtyBtn" class="w-9 h-9 border border-blue-200 rounded-lg bg-white font-bold text-blue-800 hover:bg-blue-50 active:bg-blue-100 transition shadow-sm">-</button>
-                            <input type="number" id="posQuantityInput" min="1" max="999" value="1"
-                                class="flex-1 px-3 py-1.5 border border-blue-200 bg-white rounded-lg text-center font-bold text-sm text-blue-900 focus:ring-2 focus:ring-blue-500 outline-none">
-                            <button type="button" id="incQtyBtn" class="w-9 h-9 border border-blue-200 rounded-lg bg-white font-bold text-blue-800 hover:bg-blue-50 active:bg-blue-100 transition shadow-sm">+</button>
-                        </div>
-                    </div>
-
-                    <p id="errorMsg" class="text-xs text-red-500 mt-1 hidden font-medium">⚠️ 輸入格式不符，請確認長度與格式</p>
-
-                    <div class="grid grid-cols-2 gap-2 pt-1">
-                        <button id="randomBtn" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold py-2 px-3 rounded-xl transition flex items-center justify-center space-x-1 border border-slate-200">
-                            <span>🎲 隨機產生</span>
-                        </button>
-                        <button id="openCameraBtn" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-2 px-3 rounded-xl transition flex items-center justify-center space-x-1 shadow-sm">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h0.93a2 2 0 001.664-.89l0.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l0.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-                            <span>📷 開啟鏡頭掃描</span>
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 自動調整邊界與大小預覽畫布 (Preview Canvas) -->
-            <div id="previewCard" class="preview-card bg-white p-5 rounded-2xl shadow-sm border border-slate-200/80 flex flex-col items-center justify-start min-h-[540px] transition-all relative">
-                
-                <!-- 預覽畫布頂部控制導引列 -->
-                <div class="w-full flex flex-col sm:flex-row justify-between items-start sm:items-center mb-3.5 no-print border-b border-slate-100 pb-3 gap-2">
-                    <div class="flex items-center space-x-2">
-                        <div class="w-2.5 h-2.5 rounded-full bg-blue-600"></div>
-                        <div>
-                            <h3 id="previewTitle" class="text-xs uppercase tracking-wider text-slate-800 font-bold flex items-center space-x-1.5">
-                                <span>預覽畫布 (Preview Canvas)</span>
-                                <span id="itemCounterBadge" class="bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-md text-[10px] font-bold font-mono">1 個標籤</span>
-                            </h3>
-                            <p id="paperDimHintText" class="text-[11px] text-slate-500 font-medium">規格：A4 全頁標籤紙 (210 × 297 mm, 直向)</p>
-                        </div>
-                    </div>
-
-                    <!-- 紙張規格與方向設定區 (即時驅動畫布與排版) -->
-                    <div class="flex items-center space-x-2 w-full sm:w-auto justify-between sm:justify-end">
-                        <!-- 紙張方向切換按鈕 -->
-                        <div class="bg-slate-100 p-0.5 rounded-lg border border-slate-200 flex space-x-0.5">
-                            <button type="button" id="orientPortraitBtn" class="px-2 py-1 rounded text-[11px] font-bold bg-white text-blue-700 shadow-sm transition" title="直向預覽與列印">
-                                📱 直向
-                            </button>
-                            <button type="button" id="orientLandscapeBtn" class="px-2 py-1 rounded text-[11px] font-bold text-slate-600 hover:text-slate-900 transition" title="橫向預覽與列印">
-                                💻 橫向
-                            </button>
-                        </div>
-
-                        <select id="paperPresetSelect" class="px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-blue-500 transition cursor-pointer">
-                            <option value="A4" selected>📄 A4 全頁 (210 x 297 mm)</option>
-                            <option value="LABEL_100x150">🏷️ 超商三模標籤紙 (100 x 150 mm)</option>
-                            <option value="LABEL_100x100">🏷️ 物流標籤紙 (100 x 100 mm)</option>
-                            <option value="LABEL_70x50">🏷️ 商品中貼紙 (70 x 50 mm)</option>
-                            <option value="LABEL_50x30">🏷️ 商品小貼紙 (50 x 30 mm)</option>
-                            <option value="CUSTOM">⚙️ 自訂尺寸...</option>
-                        </select>
-                    </div>
-                </div>
-
-                <!-- 分頁導航列 -->
-                <div id="pageNavToolbar" class="w-full flex items-center justify-between bg-slate-50 border border-slate-200/80 px-3 py-1.5 rounded-xl mb-3 text-xs text-slate-700 no-print hidden">
-                    <div class="flex items-center space-x-1">
-                        <button id="prevPageBtn" class="px-2 py-1 bg-white hover:bg-slate-100 border border-slate-200 rounded-lg text-slate-700 font-bold transition disabled:opacity-40">上一頁</button>
-                        <span id="pageIndicatorText" class="font-mono font-bold px-2 text-blue-700">第 1 / 1 頁</span>
-                        <button id="nextPageBtn" class="px-2 py-1 bg-white hover:bg-slate-100 border border-slate-200 rounded-lg text-slate-700 font-bold transition disabled:opacity-40">下一頁</button>
-                    </div>
-                    <label for="showAllPagesCheckbox" class="flex items-center text-[11px] font-semibold text-slate-600 cursor-pointer select-none">
-                        <input type="checkbox" id="showAllPagesCheckbox" checked class="w-3.5 h-3.5 text-blue-600 rounded mr-1 focus:ring-blue-500 accent-blue-600">
-                        <span>展開全頁預覽</span>
-                    </label>
-                </div>
-                
-                <!-- 單張與批量預覽畫布面板 (直/橫向即時重排反應) -->
-                <div id="galleryContainer" class="w-full checkerboard-bg rounded-xl border border-slate-200/80 p-4 sm:p-6 min-h-[420px] max-h-[680px] overflow-y-auto flex flex-col items-center justify-start shadow-inner space-y-6">
-                    <!-- 動態模擬紙張 Sheet -->
-                </div>
-            </div>
-        </section>
-
-        <!-- 右側：批量輸入、標籤附註、排版與導出按鈕 -->
-        <section class="lg:col-span-6 space-y-6 no-print">
-            
-            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200/80 no-print space-y-5">
-                
-                <!-- 批量輸入區 -->
-                <div id="batchInputArea" class="space-y-3 hidden border-b border-slate-100 pb-5">
-                    <div class="flex items-center space-x-2 border-b border-slate-100 pb-2">
-                        <button type="button" id="batchModeTextBtn" class="text-xs font-bold px-2.5 py-1 rounded-md bg-blue-100 text-blue-700">多行文本/CSV</button>
-                        <button type="button" id="batchModeSeqBtn" class="text-xs font-bold px-2.5 py-1 rounded-md bg-slate-100 text-slate-600">連續流水號</button>
-                    </div>
-
-                    <!-- 批量多行文本輸入 -->
-                    <div id="batchTextContainer" class="space-y-2">
-                        <div class="flex justify-between items-center">
-                            <label for="batchTextarea" class="text-xs font-semibold text-slate-600">輸入條碼列表 (每行一個，例: 471123456789,美式咖啡,數量)</label>
-                        </div>
-                        <textarea id="batchTextarea" rows="5" placeholder="471123456789,7-11 美式咖啡&#10;471123456790,拿鐵咖啡&#10;471123456791,卡布奇諾"
-                            class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none"></textarea>
-                        
-                        <div class="flex items-center justify-between gap-2">
-                            <label class="cursor-pointer bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs px-3 py-1.5 rounded-lg border border-slate-200 font-semibold inline-flex items-center space-x-1">
-                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
-                                <span>匯入 CSV</span>
-                                <input type="file" id="csvFileInput" accept=".csv,.txt" class="hidden">
-                            </label>
-
-                            <button id="openBatchCameraBtn" type="button" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg inline-flex items-center space-x-1">
-                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h0.93a2 2 0 001.664-.89l0.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l0.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path></svg>
-                                <span>掃描加入清單</span>
-                            </button>
-
-                            <span id="batchCountBadge" class="text-xs font-bold text-blue-600 font-mono">共 3 筆資料</span>
-                        </div>
-                    </div>
-
-                    <!-- 批量連續號碼產生 -->
-                    <div id="batchSeqContainer" class="space-y-3 hidden">
-                        <div>
-                            <label for="seqStartInput" class="block text-xs font-semibold text-slate-600 mb-1">起始號碼 (無檢查碼前置號)</label>
-                            <input type="text" id="seqStartInput" value="471000000001" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono">
-                        </div>
-                        <div class="grid grid-cols-2 gap-2">
-                            <div>
-                                <label for="seqCountInput" class="block text-xs font-semibold text-slate-600 mb-1">產生數量</label>
-                                <input type="number" id="seqCountInput" value="12" min="1" max="200" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono">
-                            </div>
-                            <div>
-                                <label for="seqPrefixNote" class="block text-xs font-semibold text-slate-600 mb-1">品名範本 (可空)</label>
-                                <input type="text" id="seqPrefixNote" value="商品樣品 #" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs">
-                            </div>
-                        </div>
-                        <button type="button" id="generateSeqBtn" class="w-full bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold py-2 rounded-xl">產生連續清單</button>
-                    </div>
-                </div>
-
-                <!-- 商品標籤附註設定 (列印時完整保留與顯示) -->
-                <div id="notePanel" class="space-y-3">
-                    <div class="flex items-center justify-between">
-                        <h3 class="text-xs font-bold text-slate-700 uppercase tracking-wider">商品標籤附註 (Note)</h3>
-                        <label for="enableNote" class="text-xs text-blue-600 font-semibold flex items-center cursor-pointer select-none">
-                            <input type="checkbox" id="enableNote" checked class="w-4 h-4 text-blue-600 rounded mr-1.5 focus:ring-blue-500 accent-blue-600">
-                            <span>啟用附註 (顯示品名)</span>
-                        </label>
-                    </div>
-
-                    <div id="noteControlsArea" class="space-y-3 transition-all duration-200">
-                        <div id="singleNoteInputContainer">
-                            <input type="text" id="noteInput" placeholder="例如：7-11 美式咖啡 $35" value="7-11 美式咖啡 $35"
-                                class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition">
-                        </div>
-
-                        <div class="grid grid-cols-2 gap-2">
-                            <div>
-                                <label for="notePosition" class="block text-[11px] font-medium text-slate-500 mb-1">顯示位置</label>
-                                <select id="notePosition" class="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none">
-                                    <option value="top" selected>條碼上方 (Top)</option>
-                                    <option value="bottom">條碼下方 (Bottom)</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label for="noteAlign" class="block text-[11px] font-medium text-slate-500 mb-1">對齊方式</label>
-                                <select id="noteAlign" class="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none">
-                                    <option value="center" selected>居中對齊</option>
-                                    <option value="left">靠左對齊</option>
-                                    <option value="right">靠右對齊</option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 排版與尺寸設定 (支援自動排版與手動調整) -->
-                <div class="space-y-3 border-t border-slate-100 pt-4">
-                    <div class="flex items-center justify-between">
-                        <h3 class="text-xs font-bold text-slate-700 uppercase tracking-wider">標籤列印與尺寸排版</h3>
-                        <label for="autoLayoutCheckbox" class="text-xs text-blue-600 font-semibold flex items-center cursor-pointer select-none">
-                            <input type="checkbox" id="autoLayoutCheckbox" checked class="w-4 h-4 text-blue-600 rounded mr-1.5 focus:ring-blue-500 accent-blue-600">
-                            <span>自動調整排版 (Auto Layout)</span>
-                        </label>
-                    </div>
-                    
-                    <!-- 第一行：單筆張數與 列印欄數 -->
-                    <div class="grid grid-cols-2 gap-2">
-                        <div>
-                            <label for="labelCopiesInput" class="block text-[11px] font-semibold text-blue-700 mb-1">單筆張數 (重複列印)</label>
-                            <input type="number" id="labelCopiesInput" min="1" max="99" value="1"
-                                class="w-full px-2.5 py-1.5 bg-blue-50/50 border border-blue-200 rounded-lg text-xs font-bold text-blue-900 focus:ring-2 focus:ring-blue-500 outline-none">
-                        </div>
-                        <div>
-                            <label for="printColsSelect" class="block text-[11px] font-medium text-slate-500 mb-1">頁面排版欄數</label>
-                            <select id="printColsSelect" class="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none disabled:opacity-50">
-                                <option value="1">單欄橫跨 (1 欄)</option>
-                                <option value="2">每頁 2 欄 (大貼紙)</option>
-                                <option value="3" selected>每頁 3 欄 (標準規格)</option>
-                                <option value="4">每頁 4 欄 (緊湊規格)</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <!-- 第二行：條碼高度自適應與手動調整控制 -->
-                    <div class="bg-slate-50 p-3 rounded-xl border border-slate-200/60 space-y-2">
-                        <div class="flex justify-between items-center">
-                            <label for="autoHeightCheckbox" class="text-xs text-blue-700 font-bold flex items-center cursor-pointer select-none">
-                                <input type="checkbox" id="autoHeightCheckbox" checked class="w-4 h-4 text-blue-600 rounded mr-1.5 focus:ring-blue-500 accent-blue-600">
-                                <span>自動調整條碼高度 (Auto Bar Height)</span>
-                            </label>
-                            <span id="barHeightValueText" class="text-[11px] font-mono font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-100">自動 70px</span>
-                        </div>
-                        <input type="range" id="barHeight" min="40" max="140" value="70" class="w-full accent-blue-600 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">
-                    </div>
-                </div>
-
-                <!-- 導出圖片格式設定 -->
-                <div id="exportFormatArea" class="bg-blue-50/40 p-3.5 rounded-xl border border-blue-100/80 space-y-2 border-t border-slate-100">
-                    <div class="flex justify-between items-center">
-                        <label for="exportImageFormatSelect" class="text-xs font-bold text-blue-900 flex items-center space-x-1">
-                            <span>🖼️ 導出圖片格式 (Format)</span>
-                        </label>
-                        <span class="text-[10px] text-blue-600 font-semibold">單張/ZIP 下載生效</span>
-                    </div>
-                    <select id="exportImageFormatSelect" class="w-full px-2.5 py-1.5 bg-white border border-blue-200 rounded-lg text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-blue-500 transition cursor-pointer">
-                        <option value="png" selected>PNG 格式 (無損高解析度，推薦印刷)</option>
-                        <option value="jpeg">JPEG 格式 (標準廣泛相容，白色底)</option>
-                        <option value="webp">WEBP 格式 (高壓縮率，極小檔案規格)</option>
-                    </select>
-                </div>
-
-                <!-- 下載與匯出按鈕組 -->
-                <div class="space-y-2 border-t border-slate-100 pt-4">
-                    <button id="downloadBatchZipBtn" class="w-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold py-2.5 px-4 rounded-xl shadow-md transition-all flex items-center justify-center space-x-2 text-sm">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
-                        <span id="downloadBtnText">打包下載全部 ZIP 圖檔</span>
-                    </button>
-                    <button id="printLabelsBtn" class="w-full bg-slate-800 hover:bg-slate-900 text-white font-semibold py-2.5 px-4 rounded-xl shadow-sm transition-all flex items-center justify-center space-x-2 text-sm">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
-                        <span>列印 / 輸出 PDF 標籤頁 (條碼+品名)</span>
-                    </button>
-                </div>
-            </div>
-
-            <!-- 操作說明 (列印時自動隱藏) -->
-            <div id="printTipsPanel" class="bg-slate-50 p-4 rounded-2xl border border-slate-200/80 text-xs text-slate-600 space-y-1 no-print">
-                <p class="font-bold text-slate-800 flex items-center space-x-1">
-                    <span>💡 條碼純淨列印與排版說明：</span>
-                </p>
-                <p>1. **完整保留條碼與品名**：列印時會完整保留條碼圖案與商品品名附註，並去除網頁邊框與選單。</p>
-                <p>2. **自動/手動排版切換**：開啟「自動調整排版」可自動計算最佳欄數與容量；關閉後可自訂欄數與條碼高度。</p>
-            </div>
-        </section>
-    </main>
-
-    <!-- 相機掃描 Modal 對話框 -->
-    <div id="cameraModal" class="fixed inset-0 bg-slate-900/85 backdrop-blur-md z-50 flex items-center justify-center hidden no-print">
-        <div class="bg-white rounded-2xl max-w-md w-full p-5 shadow-2xl relative mx-4 border border-slate-100 flex flex-col">
-            <button id="closeCameraBtn" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 p-1 z-20">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        <div class="tools-header">
+            <span style="font-size: 13px; font-weight: bold; color: #334155;">🛠️ 快速辨識與匯入工具</span>
+            <button class="btn-toggle-tools" onclick="toggleCollapsibleTools()">
+                <span id="toolsToggleIcon">👁️ 顯示進階工具</span>
             </button>
+        </div>
+
+        <div class="tools-grid">
+            <button class="btn-tool" onclick="startCameraScan()">📷 開啟自動辨識</button>
+            <button class="btn-tool" onclick="document.getElementById('fileInput').click()">🖼️ 圖片檔辨識</button>
+        </div>
+
+        <div class="collapsible-tools" id="collapsibleToolsBlock">
+            <button class="btn-tool" onclick="autoPasteAndRecognize()">📋 貼上辨識</button>
+            <button class="btn-tool" onclick="batchImportPrompt()">📝 批量文字/備註匯入</button>
+        </div>
+
+        <input type="file" id="fileInput" accept="image/*" onchange="scanImageFile(this)">
+
+        <div id="scanner-container" style="margin-top: 12px;">
+            <button class="close-scanner" onclick="stopCameraScan()">✕</button>
+            <video id="video" playsinline></video>
             
-            <div class="mb-3">
-                <h3 class="text-base font-bold text-slate-900 flex items-center space-x-2">
-                    <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping"></span>
-                    <span>即時鏡頭對焦掃描</span>
-                </h3>
-                <p class="text-xs text-slate-400">請將實體條碼置於中央對焦區域內</p>
-            </div>
-
-            <!-- 鏡頭靈敏度控制 -->
-            <div class="mb-3 bg-slate-50 p-2.5 rounded-xl border border-slate-200/80 flex items-center justify-between text-xs">
-                <label for="scanSensitivitySelect" class="font-bold text-slate-700 flex items-center space-x-1">
-                    <svg class="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-                    <span>感應靈敏度:</span>
-                </label>
-                <select id="scanSensitivitySelect" class="px-2 py-1 bg-white border border-slate-300 rounded-lg font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer">
-                    <option value="high">🚀 高靈敏度 (極速連掃)</option>
-                    <option value="balanced" selected>⚖️ 平衡模式 (推薦標準)</option>
-                    <option value="accurate">🎯 高精準 / 模糊反光防抖</option>
-                </select>
-            </div>
-
-            <div class="relative bg-black rounded-xl overflow-hidden aspect-video flex items-center justify-center shadow-inner scanner-container">
-                <video id="webcamVideo" class="w-full h-full object-cover" autoplay playsinline muted></video>
-                <div class="scanner-laser"></div>
-                <div class="focus-box">
-                    <div class="focus-corner corner-tl"></div>
-                    <div class="focus-corner corner-tr"></div>
-                    <div class="focus-corner corner-bl"></div>
-                    <div class="focus-corner corner-br"></div>
-                </div>
-                <div id="cameraStatus" class="absolute bottom-3 bg-black/75 text-white text-[11px] px-3 py-1 rounded-full backdrop-blur-md z-20 font-medium">
-                    正在啟動相機...
+            <div class="sensitivity-bar-top">
+                <span class="sensitivity-title">感應靈敏度：</span>
+                <div class="btn-sens-group">
+                    <button class="btn-sens" onclick="setSensitivity(350)">標準</button>
+                    <button class="btn-sens active" onclick="setSensitivity(180)">高靈敏</button>
+                    <button class="btn-sens" onclick="setSensitivity(80)">極速</button>
                 </div>
             </div>
 
-            <div class="mt-4 flex items-center justify-between">
-                <button id="switchCameraBtn" type="button" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg">翻轉鏡頭</button>
-                <button id="cancelCameraBtn" class="px-4 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs font-semibold rounded-lg">關閉</button>
+            <div class="scan-overlay">
+                <div class="scan-status-tag" id="scanStatusTag">🟢 自動辨識掃描中... 對準條碼即可自動帶入</div>
+            </div>
+
+            <div class="flash-effect" id="flashEffect"></div>
+        </div>
+
+        <div id="statusMsg" class="status-msg"></div>
+
+        <div class="editor-card" id="editorCard">
+            <div class="editor-header">
+                <span>✏️ 獨立商品修改專區 (目前修改：<span id="editingIndexText">第 1 項</span>)</span>
+            </div>
+            <div class="editor-row">
+                <div class="form-group flex-2">
+                    <label for="editNoteInput">條碼備註 (名稱/說明)</label>
+                    <input type="text" id="editNoteInput" placeholder="例如：商品名稱" oninput="saveCurrentEdit()">
+                </div>
+                <div class="form-group flex-3">
+                    <label for="editBarcodeInput">商品條碼 (Barcode)</label>
+                    <input type="text" id="editBarcodeInput" placeholder="請輸入商品條碼" oninput="saveCurrentEdit()">
+                </div>
+                <div class="form-group flex-1">
+                    <label for="editQtyInput">數量</label>
+                    <input type="number" id="editQtyInput" min="1" max="99" oninput="saveCurrentEdit()">
+                </div>
             </div>
         </div>
+
+        <div class="section-title">
+            <span>商品批量清單 (<span id="itemCount">1</span> 項 - 點選項目進行修改)</span>
+            <button class="btn btn-primary" style="flex:none; padding:4px 10px;" onclick="addItemRow()">+ 新增品項</button>
+        </div>
+
+        <div class="items-list-wrapper" id="itemsListContainer"></div>
+
+        <div class="section-title">
+            <span>⚙️ 條碼模式與排版設定</span>
+        </div>
+        <div class="layout-controls-container">
+            <div class="control-block">
+                <label>條碼輸出類型 (控制一維、二維或組合顯示)</label>
+                <div class="btn-toggle-group" id="barcodeTypeToggleGroup">
+                    <button class="btn-toggle" data-type="ean8" onclick="setBarcodeType('ean8')">僅EAN-8</button>
+                    <button class="btn-toggle" data-type="ean13" onclick="setBarcodeType('ean13')">僅EAN-13</button>
+                    <button class="btn-toggle" data-type="code128" onclick="setBarcodeType('code128')">僅Code128</button>
+                    <button class="btn-toggle" data-type="qrcode" onclick="setBarcodeType('qrcode')">僅二維條碼</button>
+                    <button class="btn-toggle active" data-type="both" onclick="setBarcodeType('both')">一維 + 二維</button>
+                </div>
+            </div>
+
+            <div class="control-block">
+                <label>列印排版欄數 (Columns)</label>
+                <div class="btn-toggle-group" id="columnsToggleGroup">
+                    <button class="btn-toggle" onclick="setLayoutColumns(1)">單列 (1欄)</button>
+                    <button class="btn-toggle active" onclick="setLayoutColumns(2)">雙列 (2欄)</button>
+                    <button class="btn-toggle" onclick="setLayoutColumns(3)">三列 (3欄)</button>
+                    <button class="btn-toggle" onclick="setLayoutColumns(4)">四列 (4欄)</button>
+                </div>
+            </div>
+
+            <div class="control-block">
+                <label>數量自動重複產生標籤</label>
+                <div class="btn-toggle-group" id="repeatToggleGroup">
+                    <button class="btn-toggle active" onclick="setRepeatQty(true)">是 (依數量複製多張)</button>
+                    <button class="btn-toggle" onclick="setRepeatQty(false)">否 (僅顯示單張貼紙)</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="action-btns">
+            <button class="btn" onclick="clearAllItems()">🗑️ 清空列表</button>
+            <button class="btn btn-save" onclick="downloadAllBarcodeImages()">📥 批量下載所有條碼圖片</button>
+            <button class="btn btn-print" onclick="window.print()">🖨️ 列印標籤貼紙 / 輸出 PDF</button>
+        </div>
+
+        <div class="section-title">
+            <span>商品條碼數據 JSON (自動即時同步)</span>
+        </div>
+        <textarea id="jsonInput" spellcheck="false"></textarea>
+    </div>
+</div>
+
+<div class="print-layout-container">
+    <div id="outputHeader" style="text-align: center; margin-bottom: 12px; font-weight: bold; font-size: 14px;">
+        商品條碼標籤列印預覽 (<span id="labelCountBadge">0</span> 張)
     </div>
 
-    <!-- 主邏輯程式碼 -->
-    <script>
-        // 編碼常量定義
-        const L_CODE = ["0001101", "0011001", "0010011", "0111101", "0100011", "0110001", "0101111", "0111011", "0110111", "0001011"];
-        const G_CODE = ["0100111", "0110011", "0011011", "0100001", "0011101", "0111001", "0000101", "0010001", "0001001", "0010111"];
-        const R_CODE = ["1110010", "1100110", "1101100", "1000010", "1011100", "1001110", "1010000", "1000100", "1001000", "1110100"];
-        const PARITY_PATTERNS = ["LLLLLL", "LLGLGG", "LLGGLG", "LLGGGL", "LGLLGG", "LGGGLL", "LGGGLL", "LGLGLG", "LGLGGL", "LGGLGL"];
+    <div class="barcode-grid grid-cols-2" id="barcodeGrid"></div>
+</div>
 
-        const CODE128_PATTERNS = [
-            "212222", "222122", "222221", "121223", "121322", "131222", "122213", "122312", "132212", "221213",
-            "221312", "231212", "112232", "122132", "122231", "113222", "123122", "123221", "223211", "221132",
-            "221231", "213212", "223112", "312131", "311222", "321122", "321221", "312212", "322112", "322211",
-            "212123", "212321", "201321", "111323", "131123", "131321", "112313", "132113", "132311", "211313",
-            "231113", "231311", "112133", "112331", "132131", "113123", "113321", "133121", "313121", "211331",
-            "231131", "213113", "213311", "213131", "311123", "311321", "331121", "312113", "332111", "314111",
-            "221411", "431111", "111224", "111422", "121124", "121421", "141122", "141221", "112214", "112412",
-            "122114", "122411", "142112", "142211", "241211", "221114", "413111", "241112", "134111", "111242",
-            "121142", "121241", "114212", "124112", "124211", "411212", "421112", "421211", "212141", "214121",
-            "412121", "111143", "111341", "131141", "114113", "114311", "411113", "411311", "113141", "114131",
-            "311141", "411131", "211412", "211214", "211232", "2331112"
-        ];
+<script>
+    let itemsData = [
+        { note: "7-11一元購物袋", barcode: "20719128", quantity: 1 }
+    ];
+    let selectedIndex = 0;
 
-        // 常用紙張規格表與容量定義（含直向與橫向容量對應）
-        const PAPER_PRESETS = {
-            'A4': { 
-                name: 'A4 全頁標籤紙', 
-                sizeCss: 'A4', 
-                widthMm: 210, 
-                heightMm: 297, 
-                aspectRatioPortrait: '210/297', 
-                aspectRatioLandscape: '297/210', 
-                defaultColsPortrait: 3, 
-                defaultColsLandscape: 4,
-                itemsPerPagePortrait: { 1: 10, 2: 18, 3: 24, 4: 32 },
-                itemsPerPageLandscape: { 1: 8, 2: 14, 3: 18, 4: 24 }
-            },
-            'LABEL_100x150': { 
-                name: '超商三模標籤紙', 
-                sizeCss: '100mm 150mm', 
-                widthMm: 100, 
-                heightMm: 150, 
-                aspectRatioPortrait: '100/150', 
-                aspectRatioLandscape: '150/100', 
-                defaultColsPortrait: 1, 
-                defaultColsLandscape: 2,
-                itemsPerPagePortrait: { 1: 3, 2: 6, 3: 9, 4: 12 },
-                itemsPerPageLandscape: { 1: 2, 2: 4, 3: 6, 4: 8 }
-            },
-            'LABEL_100x100': { 
-                name: '雙模物流標籤紙', 
-                sizeCss: '100mm 100mm', 
-                widthMm: 100, 
-                heightMm: 100, 
-                aspectRatioPortrait: '1/1', 
-                aspectRatioLandscape: '1/1', 
-                defaultColsPortrait: 1, 
-                defaultColsLandscape: 1,
-                itemsPerPagePortrait: { 1: 2, 2: 4, 3: 6, 4: 8 },
-                itemsPerPageLandscape: { 1: 2, 2: 4, 3: 6, 4: 8 }
-            },
-            'LABEL_70x50': { 
-                name: '商品中貼紙', 
-                sizeCss: '70mm 50mm', 
-                widthMm: 70, 
-                heightMm: 50, 
-                aspectRatioPortrait: '70/50', 
-                aspectRatioLandscape: '50/70', 
-                defaultColsPortrait: 1, 
-                defaultColsLandscape: 1,
-                itemsPerPagePortrait: { 1: 1, 2: 2, 3: 3, 4: 4 },
-                itemsPerPageLandscape: { 1: 1, 2: 2, 3: 3, 4: 4 }
-            },
-            'LABEL_50x30': { 
-                name: '商品小貼紙', 
-                sizeCss: '50mm 30mm', 
-                widthMm: 50, 
-                heightMm: 30, 
-                aspectRatioPortrait: '50/30', 
-                aspectRatioLandscape: '30/50', 
-                defaultColsPortrait: 1, 
-                defaultColsLandscape: 1,
-                itemsPerPagePortrait: { 1: 1, 2: 2, 3: 3, 4: 4 },
-                itemsPerPageLandscape: { 1: 1, 2: 2, 3: 3, 4: 4 }
-            },
-            'CUSTOM': { 
-                name: '自訂長寬規格', 
-                sizeCss: 'auto', 
-                widthMm: 210, 
-                heightMm: 297, 
-                aspectRatioPortrait: 'auto', 
-                aspectRatioLandscape: 'auto', 
-                defaultColsPortrait: 2, 
-                defaultColsLandscape: 3,
-                itemsPerPagePortrait: { 1: 8, 2: 16, 3: 24, 4: 32 },
-                itemsPerPageLandscape: { 1: 6, 2: 12, 3: 18, 4: 24 }
+    let currentBarcodeType = 'both';
+    let currentLayoutColumns = 2;
+    let currentRepeatQty = true;
+
+    let isUpdatingFromJson = false;
+    let codeReader = null;
+    let nativeDetector = null;
+    let mediaStream = null;
+    let lastScannedCode = "";
+    let lastScanTime = 0;
+    let audioCtx = null;
+    let animFrameId = null;
+    let lastScanTimestamp = 0;
+    let isProcessingFrame = false;
+    let currentSensitivityMs = 180;
+    let showCollapsibleTools = false;
+
+    function toggleCollapsibleTools() {
+        showCollapsibleTools = !showCollapsibleTools;
+        const block = document.getElementById('collapsibleToolsBlock');
+        const icon = document.getElementById('toolsToggleIcon');
+        if (showCollapsibleTools) {
+            block.style.display = 'grid';
+            icon.innerText = '🙈 隱藏進階工具';
+        } else {
+            block.style.display = 'none';
+            icon.innerText = '👁️ 顯示進階工具';
+        }
+    }
+
+    function playBeepSound() {
+        try {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(1800, audioCtx.currentTime);
+            gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.12);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.12);
+        } catch (e) {
+            console.log('Beep sound error:', e);
+        }
+    }
+
+    function detectBarcodeFormat(barcodeStr) {
+        const cleanStr = (barcodeStr || '').trim();
+        if (/^\d{7,8}$/.test(cleanStr)) {
+            return "EAN-8";
+        } else if (/^\d{12,13}$/.test(cleanStr)) {
+            return "EAN-13";
+        } else {
+            return "Code128";
+        }
+    }
+
+    // 智慧取得一維條碼格式：完全依據條碼內容位數自動判斷，不受頂部輸出類型按鈕切換影響
+    function getSmartBarcodeFormat(barcodeStr) {
+        const clean = (barcodeStr || '').trim();
+        if (/^\d{7,8}$/.test(clean)) {
+            return "EAN8";
+        } else if (/^\d{12,13}$/.test(clean)) {
+            return "EAN13";
+        } else {
+            return "CODE128";
+        }
+    }
+
+    function showStatus(text) {
+        const msg = document.getElementById('statusMsg');
+        msg.innerText = text;
+        msg.style.display = 'block';
+        setTimeout(() => { msg.style.display = 'none'; }, 3500);
+    }
+
+    function triggerFlashEffect() {
+        const flash = document.getElementById('flashEffect');
+        if (flash) {
+            flash.style.opacity = '1';
+            setTimeout(() => { flash.style.opacity = '0'; }, 120);
+        }
+    }
+
+    function setSensitivity(ms) {
+        currentSensitivityMs = ms;
+        const btns = document.querySelectorAll('.btn-sens');
+        btns.forEach(btn => btn.classList.remove('active'));
+
+        if (ms === 350) btns[0]?.classList.add('active');
+        if (ms === 180) btns[1]?.classList.add('active');
+        if (ms === 80) btns[2]?.classList.add('active');
+    }
+
+    function setBarcodeType(type) {
+        currentBarcodeType = type;
+        const group = document.getElementById('barcodeTypeToggleGroup');
+        const btns = group.querySelectorAll('.btn-toggle');
+        btns.forEach(btn => {
+            if (btn.getAttribute('data-type') === type) {
+                btn.classList.add('active');
+            } else {
+                btn.classList.remove('active');
+            }
+        });
+        renderLayoutGridUI();
+    }
+
+    function setLayoutColumns(cols) {
+        currentLayoutColumns = cols;
+        const group = document.getElementById('columnsToggleGroup');
+        const btns = group.getElementsByClassName('btn-toggle');
+        for (let i = 0; i < btns.length; i++) {
+            if (i + 1 === cols) {
+                btns[i].classList.add('active');
+            } else {
+                btns[i].classList.remove('active');
+            }
+        }
+        renderLayoutGridUI();
+    }
+
+    function setRepeatQty(repeat) {
+        currentRepeatQty = repeat;
+        const group = document.getElementById('repeatToggleGroup');
+        const btns = group.getElementsByClassName('btn-toggle');
+        if (repeat) {
+            btns[0].classList.add('active');
+            btns[1].classList.remove('active');
+        } else {
+            btns[0].classList.remove('active');
+            btns[1].classList.add('active');
+        }
+        renderLayoutGridUI();
+    }
+
+    function enhanceLightAndContrast(sourceCanvas) {
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = sourceCanvas.width;
+        tempCanvas.height = sourceCanvas.height;
+        const ctx = tempCanvas.getContext('2d');
+        ctx.drawImage(sourceCanvas, 0, 0);
+
+        const imgData = ctx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+        const data = imgData.data;
+
+        let totalLuminance = 0;
+        const pixelCount = data.length / 4;
+        for (let i = 0; i < data.length; i += 4) {
+            totalLuminance += (data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114);
+        }
+        const avgLuminance = totalLuminance / pixelCount;
+
+        let threshold = 120;
+        if (avgLuminance < 80) {
+            threshold = Math.max(60, avgLuminance * 1.2);
+        } else if (avgLuminance > 170) {
+            threshold = Math.min(200, avgLuminance * 0.85);
+        }
+
+        for (let i = 0; i < data.length; i += 4) {
+            const lum = (data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114);
+            const val = lum > threshold ? 255 : 0;
+            data[i] = val;
+            data[i + 1] = val;
+            data[i + 2] = val;
+        }
+
+        ctx.putImageData(imgData, 0, 0);
+        return tempCanvas;
+    }
+
+    async function initBarcodeDecoders() {
+        if ('BarcodeDetector' in window) {
+            try {
+                const supportedFormats = await BarcodeDetector.getSupportedFormats();
+                if (supportedFormats && supportedFormats.length > 0) {
+                    nativeDetector = new BarcodeDetector({ formats: supportedFormats });
+                }
+            } catch (e) {
+                console.log('Native BarcodeDetector not available:', e);
+            }
+        }
+
+        if (!codeReader) {
+            const hints = new Map();
+            const formats = [
+                ZXing.BarcodeFormat.QR_CODE,
+                ZXing.BarcodeFormat.DATA_MATRIX,
+                ZXing.BarcodeFormat.EAN_13,
+                ZXing.BarcodeFormat.EAN_8,
+                ZXing.BarcodeFormat.CODE_128,
+                ZXing.BarcodeFormat.CODE_39,
+                ZXing.BarcodeFormat.UPC_A,
+                ZXing.BarcodeFormat.UPC_E
+            ];
+            hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, formats);
+            hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+            codeReader = new ZXing.BrowserMultiFormatReader(hints);
+        }
+    }
+
+    async function startCameraScan() {
+        const container = document.getElementById('scanner-container');
+        container.style.display = 'block';
+
+        await initBarcodeDecoders();
+
+        const deviceDpr = window.devicePixelRatio || 1;
+        const constraints = {
+            video: {
+                facingMode: 'environment',
+                width: { ideal: Math.round(1280 * deviceDpr) },
+                height: { ideal: Math.round(720 * deviceDpr) },
+                focusMode: { ideal: 'continuous' }
             }
         };
 
-        // 全域狀態變數
-        let appMode = 'single';
-        let currentBarcodeType = 'EAN13';
-        let outputDimension = '1D';
-        let currentPaperKey = 'A4';
-        let paperOrientation = 'portrait'; // portrait | landscape
-        let activePageIdx = 0;
-        let videoStream = null;
-        let scanAnimationFrame = null;
-        let zxingReader = null;
-        let cameraFacingMode = 'environment';
-        let lastScannedCode = '';
-        let lastScanTime = 0;
+        try {
+            mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+            const video = document.getElementById('video');
+            video.srcObject = mediaStream;
+            await video.play();
 
-        function playBeepSound() {
-            try {
-                if (navigator.vibrate) navigator.vibrate(100);
-                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                const osc = audioCtx.createOscillator();
-                const gain = audioCtx.createGain();
-                osc.type = 'sine';
-                osc.frequency.value = 1800;
-                gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
-                osc.connect(gain);
-                gain.connect(audioCtx.destination);
-                osc.start();
-                osc.stop(audioCtx.currentTime + 0.12);
-            } catch (e) {}
-        }
+            const snapCanvas = document.createElement('canvas');
+            const snapCtx = snapCanvas.getContext('2d');
 
-        function calculateEan13CheckDigit(twelveDigits) {
-            if (!/^\d{12}$/.test(twelveDigits)) return null;
-            let sum = 0;
-            for (let i = 0; i < 12; i++) {
-                const digit = parseInt(twelveDigits[i], 10);
-                sum += (i % 2 === 0) ? digit * 1 : digit * 3;
-            }
-            const remainder = sum % 10;
-            return remainder === 0 ? 0 : 10 - remainder;
-        }
+            if (animFrameId) cancelAnimationFrame(animFrameId);
+            isProcessingFrame = false;
 
-        function calculateEan8CheckDigit(sevenDigits) {
-            if (!/^\d{7}$/.test(sevenDigits)) return null;
-            let sum = 0;
-            for (let i = 0; i < 7; i++) {
-                const digit = parseInt(sevenDigits[i], 10);
-                sum += (i % 2 === 0) ? digit * 3 : digit * 1;
-            }
-            const remainder = sum % 10;
-            return remainder === 0 ? 0 : 10 - remainder;
-        }
+            const processLoop = async (timestamp) => {
+                if (!mediaStream) return;
 
-        function encodeEan13(thirteenDigits) {
-            if (!/^\d{13}$/.test(thirteenDigits)) return null;
-            const firstDigit = parseInt(thirteenDigits[0], 10);
-            const parity = PARITY_PATTERNS[firstDigit];
-            const leftSix = thirteenDigits.substring(1, 7);
-            const rightSix = thirteenDigits.substring(7, 13);
+                if (video && video.videoWidth > 0 && video.readyState === 4) {
+                    if (timestamp - lastScanTimestamp >= currentSensitivityMs && !isProcessingFrame) {
+                        lastScanTimestamp = timestamp;
+                        isProcessingFrame = true;
 
-            let binaryStr = "101";
-            for (let i = 0; i < 6; i++) {
-                const digit = parseInt(leftSix[i], 10);
-                binaryStr += (parity[i] === 'L') ? L_CODE[digit] : G_CODE[digit];
-            }
-            binaryStr += "01010";
-            for (let i = 0; i < 6; i++) {
-                binaryStr += R_CODE[parseInt(rightSix[i], 10)];
-            }
-            binaryStr += "101";
-            return binaryStr;
-        }
+                        snapCanvas.width = video.videoWidth;
+                        snapCanvas.height = video.videoHeight;
+                        snapCtx.drawImage(video, 0, 0, snapCanvas.width, snapCanvas.height);
 
-        function encodeEan8(eightDigits) {
-            if (!/^\d{8}$/.test(eightDigits)) return null;
-            const leftPart = eightDigits.substring(0, 4);
-            const rightPart = eightDigits.substring(4, 8);
+                        let detectedText = null;
 
-            let binaryStr = "101";
-            for (let i = 0; i < 4; i++) binaryStr += L_CODE[parseInt(leftPart[i], 10)];
-            binaryStr += "01010";
-            for (let i = 0; i < 4; i++) binaryStr += R_CODE[parseInt(rightPart[i], 10)];
-            binaryStr += "101";
-            return binaryStr;
-        }
-
-        function encodeCode128(text) {
-            if (!text || text.length === 0) return null;
-            let codeCodes = [];
-            let isPureEvenDigits = /^\d+$/.test(text) && (text.length % 2 === 0);
-
-            if (isPureEvenDigits) {
-                codeCodes.push(105);
-                for (let i = 0; i < text.length; i += 2) {
-                    codeCodes.push(parseInt(text.substring(i, i + 2), 10));
-                }
-            } else {
-                codeCodes.push(104);
-                for (let i = 0; i < text.length; i++) {
-                    const charCode = text.charCodeAt(i);
-                    if (charCode >= 32 && charCode <= 127) codeCodes.push(charCode - 32);
-                    else return null;
-                }
-            }
-
-            let checksum = codeCodes[0];
-            for (let i = 1; i < codeCodes.length; i++) checksum += codeCodes[i] * i;
-            codeCodes.push(checksum % 103);
-            codeCodes.push(106);
-
-            let binaryStr = "";
-            for (let codeVal of codeCodes) {
-                const pattern = CODE128_PATTERNS[codeVal];
-                let isBar = true;
-                for (let charWidth of pattern) {
-                    binaryStr += (isBar ? "1" : "0").repeat(parseInt(charWidth, 10));
-                    isBar = !isBar;
-                }
-            }
-            return { binaryStr };
-        }
-
-        function parseBarcodeItem(rawCode, rawNote, rawQty) {
-            const code = rawCode.trim();
-            if (!code) return null;
-
-            let fullCode = code;
-            let binaryStr = null;
-
-            if (currentBarcodeType === 'EAN13') {
-                if (/^\d{12}$/.test(code)) {
-                    const chk = calculateEan13CheckDigit(code);
-                    fullCode = code + chk;
-                }
-                if (/^\d{13}$/.test(fullCode)) binaryStr = encodeEan13(fullCode);
-            } else if (currentBarcodeType === 'EAN8') {
-                if (/^\d{7}$/.test(code)) {
-                    const chk = calculateEan8CheckDigit(code);
-                    fullCode = code + chk;
-                }
-                if (/^\d{8}$/.test(fullCode)) binaryStr = encodeEan8(fullCode);
-            } else {
-                const res = encodeCode128(fullCode);
-                if (res) binaryStr = res.binaryStr;
-            }
-
-            if (!binaryStr && outputDimension === '1D') return null;
-
-            const posQty = parseInt(rawQty, 10) || parseInt(document.getElementById('posQuantityInput').value, 10) || 1;
-
-            return {
-                code: fullCode,
-                note: rawNote || document.getElementById('noteInput').value.trim(),
-                quantity: posQty,
-                binaryStr: binaryStr
-            };
-        }
-
-        function getBatchItemsList() {
-            const labelCopies = Math.max(1, parseInt(document.getElementById('labelCopiesInput').value, 10) || 1);
-            let baseList = [];
-
-            if (appMode === 'single') {
-                const item = parseBarcodeItem(
-                    document.getElementById('barcodeInput').value, 
-                    document.getElementById('noteInput').value,
-                    document.getElementById('posQuantityInput').value
-                );
-                if (item) baseList.push(item);
-            } else {
-                const lines = document.getElementById('batchTextarea').value.split('\n');
-                for (let line of lines) {
-                    line = line.trim();
-                    if (!line) continue;
-                    const parts = line.split(/[,;\t]/);
-                    const code = parts[0];
-                    const note = parts.length > 1 ? parts[1] : '';
-                    const qty = parts.length > 2 ? parts[2] : null;
-                    const parsed = parseBarcodeItem(code, note, qty);
-                    if (parsed) baseList.push(parsed);
-                }
-            }
-
-            const expandedList = [];
-            baseList.forEach((item) => {
-                for (let c = 0; c < labelCopies; c++) {
-                    expandedList.push(item);
-                }
-            });
-
-            return expandedList;
-        }
-
-        function calculateAutoBarHeight(cols) {
-            const isNoteEnabled = document.getElementById('enableNote').checked;
-            const colsNum = parseInt(cols, 10) || 3;
-
-            let baseHeight = 75;
-            if (colsNum === 1) baseHeight = 100;
-            else if (colsNum === 2) baseHeight = 85;
-            else if (colsNum === 3) baseHeight = 70;
-            else if (colsNum === 4) baseHeight = 55;
-
-            if (isNoteEnabled) {
-                baseHeight = Math.max(45, baseHeight - 8);
-            }
-
-            return baseHeight;
-        }
-
-        // 套用預設紙張規格與動態方向，並更新自動欄數排版
-        function applyPaperPreset(presetKey) {
-            currentPaperKey = presetKey;
-            const paperInfo = PAPER_PRESETS[presetKey] || PAPER_PRESETS['A4'];
-
-            const printStyleEl = document.getElementById('pagePrintStyle');
-            let sizeCssVal = paperInfo.sizeCss;
-            
-            if (sizeCssVal === 'A4') {
-                sizeCssVal = `A4 ${paperOrientation}`;
-            } else if (sizeCssVal !== 'auto') {
-                sizeCssVal = `${paperInfo.sizeCss} ${paperOrientation}`;
-            }
-
-            printStyleEl.innerHTML = `
-                @page {
-                    size: ${sizeCssVal};
-                    margin: 0;
-                }
-            `;
-
-            const w = paperOrientation === 'portrait' ? paperInfo.widthMm : paperInfo.heightMm;
-            const h = paperOrientation === 'portrait' ? paperInfo.heightMm : paperInfo.widthMm;
-
-            const paperHintEl = document.getElementById('paperDimHintText');
-            paperHintEl.textContent = `規格：${paperInfo.name} (${w} × ${h} mm, ${paperOrientation === 'portrait' ? '直向' : '橫向'})`;
-
-            const isAutoLayout = document.getElementById('autoLayoutCheckbox').checked;
-            if (isAutoLayout) {
-                const targetCols = paperOrientation === 'portrait' ? paperInfo.defaultColsPortrait : paperInfo.defaultColsLandscape;
-                document.getElementById('printColsSelect').value = targetCols;
-            }
-        }
-
-        function setPaperOrientation(orientation) {
-            paperOrientation = orientation;
-            const pBtn = document.getElementById('orientPortraitBtn');
-            const lBtn = document.getElementById('orientLandscapeBtn');
-
-            if (orientation === 'portrait') {
-                pBtn.className = "px-2 py-1 rounded text-[11px] font-bold bg-white text-blue-700 shadow-sm transition";
-                lBtn.className = "px-2 py-1 rounded text-[11px] font-bold text-slate-600 hover:text-slate-900 transition";
-            } else {
-                lBtn.className = "px-2 py-1 rounded text-[11px] font-bold bg-white text-blue-700 shadow-sm transition";
-                pBtn.className = "px-2 py-1 rounded text-[11px] font-bold text-slate-600 hover:text-slate-900 transition";
-            }
-
-            applyPaperPreset(currentPaperKey);
-            activePageIdx = 0; // 重算時重置至第一頁
-            renderAll();
-        }
-
-        function getSelectedExportFormat() {
-            const fmt = document.getElementById('exportImageFormatSelect').value;
-            if (fmt === 'jpeg') return { mime: 'image/jpeg', ext: 'jpg' };
-            if (fmt === 'webp') return { mime: 'image/webp', ext: 'webp' };
-            return { mime: 'image/png', ext: 'png' };
-        }
-
-        // 下載單張圖片
-        function downloadSingleCardPng(svgOrQrId, code) {
-            const elem = document.getElementById(svgOrQrId);
-            if (!elem) return;
-
-            const formatInfo = getSelectedExportFormat();
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            canvas.width = 500;
-            canvas.height = 250;
-
-            ctx.fillStyle = '#ffffff';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-            if (outputDimension === '1D') {
-                const xml = new XMLSerializer().serializeToString(elem);
-                const svgBlob = new Blob([xml], { type: 'image/svg+xml;charset=utf-8' });
-                const url = URL.createObjectURL(svgBlob);
-                const img = new Image();
-                img.onload = () => {
-                    ctx.drawImage(img, 20, 20, 460, 210);
-                    const a = document.createElement('a');
-                    a.href = canvas.toDataURL(formatInfo.mime, 0.95);
-                    a.download = `Barcode_${code}.${formatInfo.ext}`;
-                    a.click();
-                    URL.revokeObjectURL(url);
-                };
-                img.src = url;
-            } else {
-                const qrImage = elem.querySelector('img') || elem.querySelector('canvas');
-                if (qrImage) {
-                    ctx.drawImage(qrImage, 125, 10, 250, 250);
-                    const a = document.createElement('a');
-                    a.href = canvas.toDataURL(formatInfo.mime, 0.95);
-                    a.download = `QRCode_${code}.${formatInfo.ext}`;
-                    a.click();
-                }
-            }
-        }
-
-        // 列印單一條碼功能（去除非相關元素）
-        function printSingleBarcode(cardId, pageSheetId) {
-            const cardEl = document.getElementById(cardId);
-            const sheetEl = document.getElementById(pageSheetId);
-            if (!cardEl || !sheetEl) return;
-
-            document.body.classList.add('print-single-mode');
-            sheetEl.classList.add('target-single-sheet');
-            cardEl.classList.add('target-single-card');
-
-            setTimeout(() => {
-                window.print();
-                document.body.classList.remove('print-single-mode');
-                sheetEl.classList.remove('target-single-sheet');
-                cardEl.classList.remove('target-single-card');
-            }, 100);
-        }
-
-        function copyCodeToClipboard(codeText) {
-            const textArea = document.createElement("textarea");
-            textArea.value = codeText;
-            document.body.appendChild(textArea);
-            textArea.select();
-            try {
-                document.execCommand('copy');
-                alert(`已成功複製條碼內容: ${codeText}`);
-            } catch (err) {
-                alert('複製失敗，請手動複製');
-            }
-            document.body.removeChild(textArea);
-        }
-
-        function updateUIControlsState() {
-            const enableNote = document.getElementById('enableNote').checked;
-            const noteControlsArea = document.getElementById('noteControlsArea');
-            if (enableNote) {
-                noteControlsArea.classList.remove('opacity-40', 'pointer-events-none');
-            } else {
-                noteControlsArea.classList.add('opacity-40', 'pointer-events-none');
-            }
-
-            const isAutoLayout = document.getElementById('autoLayoutCheckbox').checked;
-            const printColsSelect = document.getElementById('printColsSelect');
-            if (isAutoLayout) {
-                printColsSelect.disabled = true;
-            } else {
-                printColsSelect.disabled = false;
-            }
-
-            const isAutoHeight = document.getElementById('autoHeightCheckbox').checked;
-            const barHeightInput = document.getElementById('barHeight');
-            if (isAutoHeight) {
-                barHeightInput.disabled = true;
-            } else {
-                barHeightInput.disabled = false;
-            }
-
-            const posQtyContainer = document.getElementById('posQuantityContainer');
-            if (outputDimension === '2D' && appMode === 'single') {
-                posQtyContainer.classList.remove('hidden');
-            } else {
-                posQtyContainer.classList.add('hidden');
-            }
-        }
-
-        // 渲染主畫布：包含預覽與純淨輸出
-        function renderAll() {
-            updateUIControlsState();
-
-            const isAutoLayout = document.getElementById('autoLayoutCheckbox').checked;
-            const paperInfo = PAPER_PRESETS[currentPaperKey] || PAPER_PRESETS['A4'];
-
-            if (isAutoLayout) {
-                const autoCols = paperOrientation === 'portrait' ? paperInfo.defaultColsPortrait : paperInfo.defaultColsLandscape;
-                document.getElementById('printColsSelect').value = autoCols;
-            }
-
-            const printCols = parseInt(document.getElementById('printColsSelect').value, 10) || 3;
-            const isAutoHeight = document.getElementById('autoHeightCheckbox').checked;
-            const barHeightInput = document.getElementById('barHeight');
-
-            let calculatedHeight = 70;
-            if (isAutoHeight) {
-                calculatedHeight = calculateAutoBarHeight(printCols);
-                barHeightInput.value = calculatedHeight;
-                document.getElementById('barHeightValueText').textContent = `自動 ${calculatedHeight}px`;
-            } else {
-                calculatedHeight = parseInt(barHeightInput.value, 10);
-                document.getElementById('barHeightValueText').textContent = `手動 ${calculatedHeight}px`;
-            }
-
-            const items = getBatchItemsList();
-            const galleryContainer = document.getElementById('galleryContainer');
-            const itemCounterBadge = document.getElementById('itemCounterBadge');
-
-            itemCounterBadge.textContent = `${items.length} 個標籤`;
-            galleryContainer.innerHTML = '';
-
-            document.documentElement.style.setProperty('--print-cols', printCols);
-
-            if (items.length === 0) {
-                galleryContainer.innerHTML = `<div class="py-16 text-center text-slate-400 font-medium text-xs w-full">⚠️ 無可顯示的有效條碼資料，請檢查輸入內容</div>`;
-                document.getElementById('pageNavToolbar').classList.add('hidden');
-                return;
-            }
-
-            const itemsPerPageMap = paperOrientation === 'portrait' ? paperInfo.itemsPerPagePortrait : paperInfo.itemsPerPageLandscape;
-            const pageSizeLimit = itemsPerPageMap[printCols] || 24;
-            const totalPages = Math.ceil(items.length / pageSizeLimit);
-
-            const pageNavToolbar = document.getElementById('pageNavToolbar');
-            if (totalPages > 1) {
-                pageNavToolbar.classList.remove('hidden');
-                document.getElementById('pageIndicatorText').textContent = `第 ${activePageIdx + 1} / ${totalPages} 頁`;
-                document.getElementById('prevPageBtn').disabled = (activePageIdx === 0);
-                document.getElementById('nextPageBtn').disabled = (activePageIdx === totalPages - 1);
-            } else {
-                pageNavToolbar.classList.add('hidden');
-                activePageIdx = 0;
-            }
-
-            const isPrinting = window.matchMedia('print').matches;
-            const showAllPages = document.getElementById('showAllPagesCheckbox').checked || isPrinting;
-
-            for (let p = 0; p < totalPages; p++) {
-                if (!showAllPages && p !== activePageIdx) continue;
-
-                const pageItems = items.slice(p * pageSizeLimit, (p + 1) * pageSizeLimit);
-                const totalRowsInPage = Math.ceil(pageItems.length / printCols);
-
-                const sheetId = `sheet-page-${p}`;
-                const sheet = document.createElement('div');
-                sheet.id = sheetId;
-                sheet.className = "paper-sheet p-4 sm:p-5 rounded-lg w-full";
-
-                const targetRatio = paperOrientation === 'portrait' ? paperInfo.aspectRatioPortrait : paperInfo.aspectRatioLandscape;
-                if (targetRatio !== 'auto') {
-                    sheet.style.aspectRatio = targetRatio;
-                }
-
-                if (currentPaperKey === 'LABEL_50x30' || currentPaperKey === 'LABEL_70x50') {
-                    sheet.style.maxWidth = paperOrientation === 'portrait' ? '340px' : '480px';
-                } else if (currentPaperKey === 'LABEL_100x100' || currentPaperKey === 'LABEL_100x150') {
-                    sheet.style.maxWidth = paperOrientation === 'portrait' ? '420px' : '580px';
-                } else {
-                    sheet.style.maxWidth = '100%';
-                }
-
-                // 頁首資訊標籤 (設有 no-print 與 sheet-header，列印時絕對隱藏)
-                const pageHeader = document.createElement('div');
-                pageHeader.className = "sheet-header w-full flex justify-between items-center pb-2 mb-3 border-b border-slate-100 text-[10px] text-slate-400 font-mono no-print";
-                pageHeader.innerHTML = `
-                    <span>📄 SHEET ${p + 1} / ${totalPages} (${paperInfo.name} - ${paperOrientation === 'portrait' ? '直向' : '橫向'})</span>
-                    <span>網格：${printCols} 欄 × ${totalRowsInPage} 列 (共 ${pageItems.length} 格)</span>
-                `;
-                sheet.appendChild(pageHeader);
-
-                const marginGuide = document.createElement('div');
-                marginGuide.className = "paper-margin-guide p-2.5 sm:p-3.5 w-full";
-
-                const grid = document.createElement('div');
-                grid.className = "w-full print-grid";
-                grid.style.display = "grid";
-                grid.style.gridTemplateColumns = `repeat(${printCols}, minmax(0, 1fr))`;
-                grid.style.gap = "8px";
-
-                const enableNote = document.getElementById('enableNote').checked;
-
-                pageItems.forEach((item, idxWithinPage) => {
-                    const globalIdx = p * pageSizeLimit + idxWithinPage;
-                    const rowIdx = Math.floor(idxWithinPage / printCols) + 1;
-                    const colIdx = (idxWithinPage % printCols) + 1;
-
-                    const cardId = `print-card-${globalIdx}`;
-                    const card = document.createElement('div');
-                    card.id = cardId;
-                    card.className = "print-card p-2 sm:p-3 rounded-lg flex flex-col items-center justify-center relative group min-w-0";
-
-                    const notePos = document.getElementById('notePosition').value;
-                    const noteAlign = document.getElementById('noteAlign').value;
-
-                    let alignClass = "text-center";
-                    if (noteAlign === 'left') alignClass = "text-left";
-                    if (noteAlign === 'right') alignClass = "text-right";
-
-                    // 格位標籤號碼 (列印時會被 CSS 隱藏)
-                    const cellBadge = `<span class="grid-cell-badge">R${rowIdx}-C${colIdx}</span>`;
-
-                    const hoverActions = `
-                        <div class="card-hover-actions absolute top-1.5 right-1.5 flex items-center space-x-1 no-print z-10">
-                            <button type="button" onclick="printSingleBarcode('${cardId}', '${sheetId}')" 
-                                class="bg-slate-800 text-white p-1 rounded-md text-[10px] shadow hover:bg-black transition" title="列印此單一條碼">
-                                🖨️
-                            </button>
-                            <button type="button" onclick="downloadSingleCardPng('${outputDimension === '1D' ? 'barcode-svg-' + globalIdx : 'qr-container-' + globalIdx}', '${item.code}')" 
-                                class="bg-blue-600 text-white p-1 rounded-md text-[10px] shadow hover:bg-blue-700 transition" title="下載單張圖片">
-                                ⬇️
-                            </button>
-                            <button type="button" onclick="copyCodeToClipboard('${item.code}')" 
-                                class="bg-slate-700 text-white p-1 rounded-md text-[10px] shadow hover:bg-slate-800 transition" title="複製條碼數字">
-                                📋
-                            </button>
-                        </div>
-                    `;
-
-                    // 附註文字區塊，列印時將完整保留與顯示
-                    if (outputDimension === '1D') {
-                        const svgId = `barcode-svg-${globalIdx}`;
-                        card.innerHTML = `
-                            ${cellBadge}
-                            ${hoverActions}
-                            ${enableNote && item.note && notePos === 'top' ? `<div class="text-[11px] font-bold text-slate-800 mb-1 w-full truncate ${alignClass}">${item.note}</div>` : ''}
-                            <svg id="${svgId}" class="w-full h-auto max-w-full mx-auto"></svg>
-                            ${enableNote && item.note && notePos === 'bottom' ? `<div class="text-[11px] font-bold text-slate-800 mt-1 w-full truncate ${alignClass}">${item.note}</div>` : ''}
-                        `;
-                        grid.appendChild(card);
-                        setTimeout(() => renderSvg1D(svgId, item, calculatedHeight), 0);
-                    } else {
-                        const qrId = `qr-container-${globalIdx}`;
-                        card.innerHTML = `
-                            ${cellBadge}
-                            ${hoverActions}
-                            ${enableNote && item.note && notePos === 'top' ? `<div class="text-[11px] font-bold text-slate-800 mb-1 w-full truncate ${alignClass}">${item.note}</div>` : ''}
-                            <div id="${qrId}" class="flex justify-center p-0.5"></div>
-                            ${enableNote && item.note && notePos === 'bottom' ? `<div class="text-[11px] font-bold text-slate-800 mt-1 w-full truncate ${alignClass}">${item.note}</div>` : ''}
-                        `;
-                        grid.appendChild(card);
-                        setTimeout(() => renderQr2D(qrId, item.code, item.quantity), 0);
-                    }
-                });
-
-                marginGuide.appendChild(grid);
-                sheet.appendChild(marginGuide);
-                galleryContainer.appendChild(sheet);
-            }
-        }
-
-        function renderSvg1D(elementId, item, barHeight) {
-            const svg = document.getElementById(elementId);
-            if (!svg || !item.binaryStr) return;
-
-            const moduleWidth = 2;
-            const binaryPattern = item.binaryStr;
-            const quietZone = (currentBarcodeType === 'EAN13') ? 11 : 10;
-            const extraGuardHeight = (currentBarcodeType === 'CODE128') ? 0 : 8;
-            const textFontSize = 13;
-
-            const totalModules = binaryPattern.length + (quietZone * 2);
-            const svgWidth = totalModules * moduleWidth;
-            const svgHeight = barHeight + textFontSize + 8;
-
-            svg.setAttribute('viewBox', `0 0 ${svgWidth} ${svgHeight}`);
-            svg.setAttribute('shape-rendering', 'crispEdges');
-
-            let html = `<rect width="100%" height="100%" fill="#ffffff"/>`;
-
-            const startX = quietZone * moduleWidth;
-
-            for (let i = 0; i < binaryPattern.length; i++) {
-                if (binaryPattern[i] === '1') {
-                    let isGuardBar = false;
-                    if (currentBarcodeType === 'EAN13') {
-                        isGuardBar = (i < 3) || (i >= 45 && i < 50) || (i >= 92);
-                    } else if (currentBarcodeType === 'EAN8') {
-                        isGuardBar = (i < 3) || (i >= 31 && i < 36) || (i >= 64);
-                    }
-
-                    const h = isGuardBar ? (barHeight + extraGuardHeight) : barHeight;
-                    html += `<rect x="${startX + (i * moduleWidth)}" y="0" width="${moduleWidth}" height="${h}" fill="#000000"/>`;
-                }
-            }
-
-            const textY = barHeight + textFontSize + 2;
-
-            if (currentBarcodeType === 'EAN13' && item.code.length === 13) {
-                html += `<text x="${startX - (5 * moduleWidth)}" y="${textY}" font-family="monospace" font-size="${textFontSize}" font-weight="bold" text-anchor="middle" fill="#000000">${item.code[0]}</text>`;
-                html += `<text x="${startX + (24 * moduleWidth)}" y="${textY}" font-family="monospace" font-size="${textFontSize}" font-weight="bold" text-anchor="middle" fill="#000000">${item.code.substring(1, 7)}</text>`;
-                html += `<text x="${startX + (71 * moduleWidth)}" y="${textY}" font-family="monospace" font-size="${textFontSize}" font-weight="bold" text-anchor="middle" fill="#000000">${item.code.substring(7, 13)}</text>`;
-            } else if (currentBarcodeType === 'EAN8' && item.code.length === 8) {
-                html += `<text x="${startX + (17 * moduleWidth)}" y="${textY}" font-family="monospace" font-size="${textFontSize}" font-weight="bold" text-anchor="middle" fill="#000000">${item.code.substring(0, 4)}</text>`;
-                html += `<text x="${startX + (50 * moduleWidth)}" y="${textY}" font-family="monospace" font-size="${textFontSize}" font-weight="bold" text-anchor="middle" fill="#000000">${item.code.substring(4, 8)}</text>`;
-            } else {
-                html += `<text x="${svgWidth / 2}" y="${textY}" font-family="monospace" font-size="${textFontSize}" font-weight="bold" text-anchor="middle" fill="#000000">${item.code}</text>`;
-            }
-
-            svg.innerHTML = html;
-        }
-
-        function renderQr2D(elementId, code, quantity) {
-            const container = document.getElementById(elementId);
-            if (!container) return;
-
-            const posQty = parseInt(quantity, 10) || 1;
-            const jsonPayload = {
-                "Goods": [{ "Commodity": [{ "Device": "POS", "Barcode": code, "Quantity": posQty }] }]
-            };
-
-            new QRCode(container, {
-                text: JSON.stringify(jsonPayload),
-                width: 120,
-                height: 120,
-                colorDark: "#000000",
-                colorLight: "#ffffff",
-                correctLevel: QRCode.CorrectLevel.M
-            });
-        }
-
-        function handleScannedCode(scannedResult) {
-            if (!scannedResult) return;
-            const now = Date.now();
-            if (scannedResult === lastScannedCode && (now - lastScanTime < 1800)) {
-                return;
-            }
-            
-            lastScannedCode = scannedResult;
-            lastScanTime = now;
-            playBeepSound();
-
-            let codeToUse = scannedResult;
-            let qtyToUse = 1;
-
-            try {
-                const jsonObj = JSON.parse(scannedResult);
-                if (jsonObj?.Goods?.[0]?.Commodity?.[0]?.Barcode) {
-                    const commodity = jsonObj.Goods[0].Commodity[0];
-                    codeToUse = commodity.Barcode;
-                    if (commodity.Quantity) qtyToUse = commodity.Quantity;
-                }
-            } catch (e) {}
-
-            if (appMode === 'single') {
-                document.getElementById('barcodeInput').value = codeToUse;
-                document.getElementById('posQuantityInput').value = qtyToUse;
-
-                const digits = codeToUse.replace(/\D/g, '');
-                if (digits.length === 13) setBarcodeType('EAN13');
-                else if (digits.length === 8) setBarcodeType('EAN8');
-                else setBarcodeType('CODE128');
-
-                renderAll();
-                stopCameraScanner();
-            } else {
-                const textarea = document.getElementById('batchTextarea');
-                const existing = textarea.value.trim();
-                textarea.value = existing ? `${existing}\n${codeToUse}` : codeToUse;
-                updateBatchCount();
-                renderAll();
-                
-                const status = document.getElementById('cameraStatus');
-                status.textContent = `✅ 已成功感應: ${codeToUse}`;
-                setTimeout(() => {
-                    if (status) status.textContent = '相機解碼中，請對準條碼...';
-                }, 1500);
-            }
-        }
-
-        async function startCameraScanner() {
-            const modal = document.getElementById('cameraModal');
-            const video = document.getElementById('webcamVideo');
-            const cameraStatus = document.getElementById('cameraStatus');
-            const sensitivity = document.getElementById('scanSensitivitySelect').value;
-
-            modal.classList.remove('hidden');
-            cameraStatus.textContent = '正在請求相機對焦與權限...';
-
-            let videoConstraints = {
-                facingMode: cameraFacingMode,
-                width: { ideal: sensitivity === 'accurate' ? 1920 : 1280 },
-                height: { ideal: sensitivity === 'accurate' ? 1080 : 720 }
-            };
-
-            try {
-                videoStream = await navigator.mediaDevices.getUserMedia({
-                    video: videoConstraints,
-                    audio: false
-                });
-
-                video.srcObject = videoStream;
-                await video.play();
-
-                cameraStatus.textContent = '相機對焦完成，請對準條碼...';
-                document.getElementById('scanBadgeText').textContent = '鏡頭掃描中';
-
-                if ('BarcodeDetector' in window) {
-                    const detector = new BarcodeDetector({ formats: ['qr_code', 'ean_13', 'ean_8', 'code_128'] });
-                    
-                    const processFrame = async () => {
-                        if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                        if (nativeDetector) {
                             try {
-                                const barcodes = await detector.detect(video);
-                                if (barcodes.length > 0) {
-                                    handleScannedCode(barcodes[0].rawValue);
-                                    if (appMode === 'single') return;
+                                const barcodes = await nativeDetector.detect(snapCanvas);
+                                if (barcodes && barcodes.length > 0) {
+                                    detectedText = barcodes[0].rawValue;
                                 }
-                            } catch (err) {}
+                            } catch (errNative) {}
                         }
-                        scanAnimationFrame = requestAnimationFrame(processFrame);
-                    };
-                    scanAnimationFrame = requestAnimationFrame(processFrame);
-                } 
-                else if (window.ZXing) {
-                    zxingReader = new ZXing.BrowserMultiFormatReader();
-                    
-                    let decodeInterval = 300;
-                    if (sensitivity === 'high') decodeInterval = 120;
-                    if (sensitivity === 'accurate') decodeInterval = 450;
 
-                    zxingReader.timeBetweenDecodingAttempts = decodeInterval;
-
-                    zxingReader.decodeFromVideoDevice(null, 'webcamVideo', (result, err) => {
-                        if (result) {
-                            handleScannedCode(result.getText());
+                        if (!detectedText && codeReader) {
+                            try {
+                                const res = await codeReader.decodeFromCanvas(snapCanvas);
+                                if (res && res.text) {
+                                    detectedText = res.text.trim();
+                                }
+                            } catch (errZXing) {
+                                try {
+                                    const enhanced = enhanceLightAndContrast(snapCanvas);
+                                    const res2 = await codeReader.decodeFromCanvas(enhanced);
+                                    if (res2 && res2.text) {
+                                        detectedText = res2.text.trim();
+                                    }
+                                } catch (errEnhanced) {}
+                            }
                         }
-                    });
-                } else {
-                    cameraStatus.textContent = '⚠️ 您的瀏覽器尚未支援條碼解碼功能';
+
+                        if (detectedText) {
+                            processScannedResult(detectedText);
+                        }
+
+                        isProcessingFrame = false;
+                    }
                 }
-            } catch (err) {
-                console.error("相機權限失敗或無法開啓鏡頭", err);
-                cameraStatus.textContent = '❌ 無法啟用鏡頭，請確認權限或使用 HTTPS';
+
+                animFrameId = requestAnimationFrame(processLoop);
+            };
+
+            animFrameId = requestAnimationFrame(processLoop);
+
+        } catch (err) {
+            alert('無法開啟相機鏡頭，請確認存取權限：' + err);
+            stopCameraScan();
+        }
+    }
+
+    function focusOnEditNote() {
+        setTimeout(() => {
+            const input = document.getElementById('editNoteInput');
+            if (input) {
+                input.focus();
+                input.select();
             }
+        }, 100);
+    }
+
+    function appendRecognizedBarcode(barcodeStr) {
+        if (itemsData[selectedIndex] && (itemsData[selectedIndex].barcode === "" || itemsData[selectedIndex].barcode === undefined)) {
+            itemsData[selectedIndex].barcode = barcodeStr;
+        } else {
+            itemsData.push({ note: "", barcode: barcodeStr, quantity: 1 });
+            selectedIndex = itemsData.length - 1;
+        }
+        renderAll();
+    }
+
+    function processScannedResult(scannedBarcode) {
+        if (!scannedBarcode) return;
+        const now = Date.now();
+
+        if (scannedBarcode === lastScannedCode && (now - lastScanTime) < 1500) {
+            return;
         }
 
-        function stopCameraScanner() {
-            if (scanAnimationFrame) cancelAnimationFrame(scanAnimationFrame);
-            if (zxingReader) {
-                zxingReader.reset();
-                zxingReader = null;
+        lastScannedCode = scannedBarcode;
+        lastScanTime = now;
+
+        try {
+            const data = JSON.parse(scannedBarcode);
+            if (data && data.Goods && data.Goods[0] && Array.isArray(data.Goods[0].Commodity)) {
+                const item = data.Goods[0].Commodity[0];
+                if (item && item.Barcode) {
+                    triggerFlashEffect();
+                    playBeepSound();
+                    appendRecognizedBarcode(String(item.Barcode));
+                    if (item.Quantity) {
+                        itemsData[selectedIndex].quantity = item.Quantity;
+                    }
+                    if (item.Note) {
+                        itemsData[selectedIndex].note = item.Note;
+                    }
+                    renderAll();
+                    focusOnEditNote();
+                    showStatus(`📸 已成功解析條碼數據！自動帶入：${item.Barcode}`);
+                    return;
+                }
             }
-            if (videoStream) {
-                videoStream.getTracks().forEach(track => track.stop());
-                videoStream = null;
+        } catch (e) {}
+
+        triggerFlashEffect();
+        playBeepSound();
+        appendRecognizedBarcode(scannedBarcode);
+        focusOnEditNote();
+
+        const detectedFormat = detectBarcodeFormat(scannedBarcode);
+        showStatus(`📸 自動辨識成功！已自動帶入 [${detectedFormat}] 條碼：` + scannedBarcode);
+    }
+
+    function stopCameraScan() {
+        if (animFrameId) {
+            cancelAnimationFrame(animFrameId);
+            animFrameId = null;
+        }
+        if (codeReader) {
+            try { codeReader.reset(); } catch(e){}
+        }
+        if (mediaStream) {
+            mediaStream.getTracks().forEach(track => track.stop());
+            mediaStream = null;
+        }
+        isProcessingFrame = false;
+        document.getElementById('scanner-container').style.display = 'none';
+    }
+
+    async function scanImageFile(input) {
+        if (!input.files || !input.files[0]) return;
+        const file = input.files[0];
+        const img = new Image();
+        img.src = URL.createObjectURL(file);
+
+        img.onload = async () => {
+            await initBarcodeDecoders();
+            let scannedBarcode = null;
+
+            if (nativeDetector) {
+                try {
+                    const barcodes = await nativeDetector.detect(img);
+                    if (barcodes && barcodes.length > 0) {
+                        scannedBarcode = barcodes[0].rawValue;
+                    }
+                } catch (e) {}
             }
-            document.getElementById('cameraModal').classList.add('hidden');
-            document.getElementById('scanBadgeText').textContent = '系統待命';
-        }
 
-        function switchCamera() {
-            cameraFacingMode = (cameraFacingMode === 'environment') ? 'user' : 'environment';
-            stopCameraScanner();
-            startCameraScanner();
-        }
+            if (!scannedBarcode && codeReader) {
+                try {
+                    const result = await codeReader.decodeFromImageElement(img);
+                    if (result && result.text) {
+                        scannedBarcode = result.text.trim();
+                    }
+                } catch (e) {}
+            }
 
-        async function downloadBatchZip() {
-            const items = getBatchItemsList();
-            if (items.length === 0) return alert('沒有可供匯出的有效條碼！');
+            if (scannedBarcode) {
+                playBeepSound();
 
-            const formatInfo = getSelectedExportFormat();
-            const zip = new JSZip();
-            const folder = zip.folder("barcodes");
-
-            const btn = document.getElementById('downloadBatchZipBtn');
-            const originalText = btn.innerHTML;
-            btn.innerHTML = `<span class="animate-spin">⏳</span> 打包處理中 (${formatInfo.ext.toUpperCase()})...`;
-
-            try {
-                for (let i = 0; i < items.length; i++) {
-                    const item = items[i];
-                    const canvas = document.createElement('canvas');
-                    const ctx = canvas.getContext('2d');
-
-                    if (outputDimension === '1D') {
-                        canvas.width = 500;
-                        canvas.height = 250;
-                        ctx.fillStyle = '#ffffff';
-                        ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-                        const svgElement = document.getElementById(`barcode-svg-${i}`);
-                        if (svgElement) {
-                            const xml = new XMLSerializer().serializeToString(svgElement);
-                            const svgBlob = new Blob([xml], { type: 'image/svg+xml;charset=utf-8' });
-                            const url = URL.createObjectURL(svgBlob);
-                            const img = new Image();
-                            
-                            await new Promise((resolve) => {
-                                img.onload = () => {
-                                    ctx.drawImage(img, 20, 20, 460, 210);
-                                    URL.revokeObjectURL(url);
-                                    resolve();
-                                };
-                                img.src = url;
-                            });
-                        }
-                    } else {
-                        canvas.width = 300;
-                        canvas.height = 300;
-                        ctx.fillStyle = '#ffffff';
-                        ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-                        const qrElem = document.getElementById(`qr-container-${i}`)?.querySelector('img') || document.getElementById(`qr-container-${i}`)?.querySelector('canvas');
-                        if (qrElem) {
-                            ctx.drawImage(qrElem, 25, 25, 250, 250);
+                try {
+                    const data = JSON.parse(scannedBarcode);
+                    if (data && data.Goods && data.Goods[0] && Array.isArray(data.Goods[0].Commodity)) {
+                        const item = data.Goods[0].Commodity[0];
+                        if (item && item.Barcode) {
+                            appendRecognizedBarcode(String(item.Barcode));
+                            if (item.Quantity) itemsData[selectedIndex].quantity = item.Quantity;
+                            if (item.Note) itemsData[selectedIndex].note = item.Note;
+                            renderAll();
+                            focusOnEditNote();
+                            showStatus(`✅ 圖片數據解析成功！已自動帶入資訊`);
+                            input.value = '';
+                            return;
                         }
                     }
+                } catch (e) {}
 
-                    const dataUrl = canvas.toDataURL(formatInfo.mime, 0.95);
-                    const base64Data = dataUrl.replace(new RegExp(`^data:${formatInfo.mime.replace('/', '\\/')};base64,`), "");
-                    folder.file(`${item.code}_${i + 1}.${formatInfo.ext}`, base64Data, { base64: true });
-                }
-
-                const content = await zip.generateAsync({ type: "blob" });
-                const a = document.createElement('a');
-                a.href = URL.createObjectURL(content);
-                a.download = `Batch_Barcodes_${formatInfo.ext.toUpperCase()}_${Date.now()}.zip`;
-                a.click();
-            } catch (err) {
-                console.error(err);
-                alert('打包下載失敗，請重試');
-            } finally {
-                btn.innerHTML = originalText;
+                appendRecognizedBarcode(scannedBarcode);
+                focusOnEditNote();
+                const detectedFormat = detectBarcodeFormat(scannedBarcode);
+                showStatus(`✅ 圖片解析成功！已自動帶入 [${detectedFormat}] 條碼：` + scannedBarcode);
+            } else {
+                alert('圖片中未辨識出可讀取的條碼或 QR Code。');
             }
+            input.value = '';
+        };
+    }
+
+    async function autoPasteAndRecognize() {
+        try {
+            const text = await navigator.clipboard.readText();
+            recognizeTextContent(text);
+        } catch (err) {
+            const text = prompt("請貼上包含條碼或相關資料的內容：");
+            if (text) recognizeTextContent(text);
         }
+    }
 
-        function setBarcodeType(type) {
-            currentBarcodeType = type;
-            ['Ean13', 'Ean8', 'Code128'].forEach(t => {
-                document.getElementById(`type${t}Btn`).className = "py-2 px-1 text-xs font-bold rounded-xl border border-slate-200 bg-slate-50 text-slate-600 text-center";
-            });
-            document.getElementById(`type${type.charAt(0) + type.slice(1).toLowerCase()}Btn`).className = "py-2 px-1 text-xs font-bold rounded-xl border border-blue-600 bg-blue-600 text-white text-center shadow-sm";
-            renderAll();
-        }
+    function recognizeTextContent(text) {
+        if (!text) return;
+        text = text.trim();
 
-        document.getElementById('csvFileInput').addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-
-            const reader = new FileReader();
-            reader.onload = function(evt) {
-                document.getElementById('batchTextarea').value = evt.target.result;
-                updateBatchCount();
+        try {
+            const data = JSON.parse(text);
+            if (data && data.Goods && data.Goods[0] && Array.isArray(data.Goods[0].Commodity)) {
+                itemsData = data.Goods[0].Commodity.map((c, i) => ({
+                    note: c.Note || (i === 0 ? "7-11一元購物袋" : ""),
+                    barcode: String(c.Barcode || ''),
+                    quantity: c.Quantity || 1
+                }));
+                selectedIndex = 0;
+                playBeepSound();
                 renderAll();
-            };
-            reader.readAsText(file);
-        });
+                showStatus('✅ 已成功匯入數據');
+                return;
+            }
+        } catch (e) {}
 
-        function updateBatchCount() {
-            const items = getBatchItemsList();
-            document.getElementById('batchCountBadge').textContent = `共 ${items.length} 筆資料`;
+        const matches = text.match(/\b\d{7,14}\b/g);
+        if (matches && matches.length > 0) {
+            playBeepSound();
+            matches.forEach(bc => appendRecognizedBarcode(bc));
+            showStatus(`✅ 已從剪貼簿解析並新增 ${matches.length} 筆條碼`);
+        } else {
+            alert('未能在輸入內容中識別出有效條碼！');
         }
+    }
 
-        function syncSingleToBatch() {
-            const singleCode = document.getElementById('barcodeInput').value.trim();
-            const singleNote = document.getElementById('noteInput').value.trim();
-            const singleQty = document.getElementById('posQuantityInput').value.trim() || '1';
+    function batchImportPrompt() {
+        const input = prompt("請貼上批量資料 (每行一筆，格式如：備註,條碼,數量 或 條碼,數量)：\n範例：\n7-11一元購物袋,20719128,2\n87654321,1");
+        if (!input) return;
 
-            if (!singleCode) return;
+        const lines = input.split('\n');
+        const newItems = [];
 
-            const newEntry = `${singleCode},${singleNote},${singleQty}`;
-            const textarea = document.getElementById('batchTextarea');
-            const lines = textarea.value.split('\n').map(l => l.trim()).filter(Boolean);
+        lines.forEach((line, idx) => {
+            const trimmed = line.trim();
+            if (!trimmed) return;
 
-            const isExist = lines.some(line => line.startsWith(singleCode));
-            if (!isExist) {
-                if (lines.length === 0) {
-                    textarea.value = newEntry;
+            const parts = trimmed.split(/[\s,\t]+/);
+            if (parts.length >= 3) {
+                newItems.push({ note: parts[0], barcode: parts[1], quantity: parseInt(parts[2], 10) || 1 });
+            } else if (parts.length === 2) {
+                if (/^\d+$/.test(parts[0])) {
+                    newItems.push({ note: idx === 0 ? "7-11一元購物袋" : "", barcode: parts[0], quantity: parseInt(parts[1], 10) || 1 });
                 } else {
-                    textarea.value = `${newEntry}\n${lines.join('\n')}`;
+                    newItems.push({ note: parts[0], barcode: parts[1], quantity: 1 });
                 }
+            } else if (parts.length === 1 && parts[0]) {
+                newItems.push({ note: idx === 0 ? "7-11一元購物袋" : "", barcode: parts[0], quantity: 1 });
             }
-            updateBatchCount();
+        });
+
+        if (newItems.length > 0) {
+            itemsData = newItems;
+            selectedIndex = 0;
+            playBeepSound();
+            renderAll();
+            showStatus(`✅ 已成功匯入 ${newItems.length} 筆資料`);
+        } else {
+            alert('無法解析輸入的內容！');
+        }
+    }
+
+    function renderItemsListUI() {
+        const container = document.getElementById('itemsListContainer');
+        container.innerHTML = '';
+
+        if (selectedIndex >= itemsData.length) {
+            selectedIndex = Math.max(0, itemsData.length - 1);
         }
 
-        function syncBatchToSingle() {
-            const textarea = document.getElementById('batchTextarea');
-            const lines = textarea.value.split('\n').map(l => l.trim()).filter(Boolean);
+        itemsData.forEach((item, index) => {
+            const row = document.createElement('div');
+            row.className = `item-list-row ${index === selectedIndex ? 'active' : ''}`;
+            row.onclick = () => selectItemToEdit(index);
 
-            if (lines.length > 0) {
-                const parts = lines[0].split(/[,;\t]/);
-                if (parts[0]) {
-                    document.getElementById('barcodeInput').value = parts[0];
-                    if (parts[1]) document.getElementById('noteInput').value = parts[1];
-                    if (parts[2]) document.getElementById('posQuantityInput').value = parts[2];
+            const formatTag = item.barcode ? detectBarcodeFormat(item.barcode) : '未設定';
 
-                    const digits = parts[0].replace(/\D/g, '');
-                    if (digits.length === 13) setBarcodeType('EAN13');
-                    else if (digits.length === 8) setBarcodeType('EAN8');
-                    else setBarcodeType('CODE128');
-                }
-            }
+            row.innerHTML = `
+                <div class="item-info">
+                    <span style="font-weight:bold; color:#64748b; font-size:12px;">#${index + 1}</span>
+                    <span class="item-note-text">${item.note || '(無備註)'}</span>
+                    <span class="item-barcode-text">${item.barcode || '(無條碼)'}</span>
+                    <span class="item-format-badge">${formatTag}</span>
+                </div>
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <span class="item-qty-badge">x${item.quantity}</span>
+                    <button class="btn-del" onclick="event.stopPropagation(); removeItemRow(${index})">✕</button>
+                </div>
+            `;
+            container.appendChild(row);
+        });
+
+        document.getElementById('itemCount').innerText = itemsData.length;
+        loadCurrentEditToInputs();
+    }
+
+    function selectItemToEdit(index) {
+        selectedIndex = index;
+        renderItemsListUI();
+    }
+
+    function loadCurrentEditToInputs() {
+        const currentItem = itemsData[selectedIndex] || { note: '', barcode: '', quantity: 1 };
+        document.getElementById('editNoteInput').value = currentItem.note || '';
+        document.getElementById('editBarcodeInput').value = currentItem.barcode || '';
+        document.getElementById('editQtyInput').value = currentItem.quantity || 1;
+        document.getElementById('editingIndexText').innerText = `第 ${selectedIndex + 1} 項`;
+    }
+
+    function saveCurrentEdit() {
+        if (!itemsData[selectedIndex]) return;
+
+        const noteVal = document.getElementById('editNoteInput').value;
+        const barcodeVal = document.getElementById('editBarcodeInput').value.trim();
+        const qtyVal = parseInt(document.getElementById('editQtyInput').value, 10) || 1;
+
+        itemsData[selectedIndex].note = noteVal;
+        itemsData[selectedIndex].barcode = barcodeVal;
+        itemsData[selectedIndex].quantity = qtyVal;
+
+        const rows = document.querySelectorAll('.item-list-row');
+        if (rows[selectedIndex]) {
+            const noteEl = rows[selectedIndex].querySelector('.item-note-text');
+            const barcodeEl = rows[selectedIndex].querySelector('.item-barcode-text');
+            const formatEl = rows[selectedIndex].querySelector('.item-format-badge');
+            const qtyEl = rows[selectedIndex].querySelector('.item-qty-badge');
+            if (noteEl) noteEl.innerText = noteVal || '(無備註)';
+            if (barcodeEl) barcodeEl.innerText = barcodeVal || '(無條碼)';
+            if (formatEl) formatEl.innerText = barcodeVal ? detectBarcodeFormat(barcodeVal) : '未設定';
+            if (qtyEl) qtyEl.innerText = `x${qtyVal}`;
         }
 
-        document.getElementById('modeSingleBtn').addEventListener('click', () => {
-            syncBatchToSingle();
-            appMode = 'single';
-            document.getElementById('modeSingleBtn').className = "px-3.5 py-1.5 rounded-lg text-xs font-bold bg-blue-600 text-white shadow";
-            document.getElementById('modeBatchBtn').className = "px-3.5 py-1.5 rounded-lg text-xs font-bold text-slate-400 hover:text-white";
-            document.getElementById('singleInputArea').classList.remove('hidden');
-            document.getElementById('batchInputArea').classList.add('hidden');
-            renderAll();
-        });
+        syncDataToJSON();
+        renderLayoutGridUI();
+    }
 
-        document.getElementById('modeBatchBtn').addEventListener('click', () => {
-            syncSingleToBatch();
-            appMode = 'batch';
-            document.getElementById('modeBatchBtn').className = "px-3.5 py-1.5 rounded-lg text-xs font-bold bg-blue-600 text-white shadow";
-            document.getElementById('modeSingleBtn').className = "px-3.5 py-1.5 rounded-lg text-xs font-bold text-slate-400 hover:text-white";
-            document.getElementById('batchInputArea').classList.remove('hidden');
-            document.getElementById('singleInputArea').classList.add('hidden');
-            updateBatchCount();
-            renderAll();
-        });
+    function adjustNoteFontSizes() {
+        const containers = document.querySelectorAll('.barcode-note-container');
+        containers.forEach(container => {
+            const textEl = container.querySelector('.barcode-note-text');
+            if (!textEl) return;
 
-        document.getElementById('dimension1DBtn').addEventListener('click', () => {
-            outputDimension = '1D';
-            document.getElementById('dimension1DBtn').className = "py-1.5 px-2 text-xs font-bold rounded-lg border border-slate-300 bg-slate-100 text-slate-800 text-center";
-            document.getElementById('dimension2DBtn').className = "py-1.5 px-2 text-xs font-bold rounded-lg border border-slate-200 bg-slate-50 text-slate-500 text-center";
-            renderAll();
-        });
+            const containerWidth = container.clientWidth - 12;
+            if (containerWidth <= 0) return;
 
-        document.getElementById('dimension2DBtn').addEventListener('click', () => {
-            outputDimension = '2D';
-            document.getElementById('dimension2DBtn').className = "py-1.5 px-2 text-xs font-bold rounded-lg border border-slate-300 bg-slate-100 text-slate-800 text-center";
-            document.getElementById('dimension1DBtn').className = "py-1.5 px-2 text-xs font-bold rounded-lg border border-slate-200 bg-slate-50 text-slate-500 text-center";
-            renderAll();
-        });
+            let maxFont = 16;
+            let minFont = 9;
 
-        document.getElementById('batchTextarea').addEventListener('input', () => {
-            updateBatchCount();
-            renderAll();
-        });
+            if (currentLayoutColumns === 3) maxFont = 14;
+            if (currentLayoutColumns === 4) maxFont = 12;
 
-        document.getElementById('generateSeqBtn').addEventListener('click', () => {
-            const startStr = document.getElementById('seqStartInput').value.trim();
-            const count = parseInt(document.getElementById('seqCountInput').value, 10) || 10;
-            const prefixNote = document.getElementById('seqPrefixNote').value.trim();
+            let currentFont = maxFont;
+            textEl.style.fontSize = currentFont + 'px';
 
-            let baseNum = parseInt(startStr, 10) || 471000000001;
-            const lines = [];
-
-            for (let i = 0; i < count; i++) {
-                const currentNumStr = String(baseNum + i).padStart(startStr.length, '0');
-                lines.push(`${currentNumStr},${prefixNote}${i + 1}`);
-            }
-
-            document.getElementById('batchTextarea').value = lines.join('\n');
-            updateBatchCount();
-            renderAll();
-        });
-
-        document.getElementById('orientPortraitBtn').addEventListener('click', () => setPaperOrientation('portrait'));
-        document.getElementById('orientLandscapeBtn').addEventListener('click', () => setPaperOrientation('landscape'));
-
-        document.getElementById('paperPresetSelect').addEventListener('change', (e) => {
-            applyPaperPreset(e.target.value);
-            renderAll();
-        });
-
-        document.getElementById('printColsSelect').addEventListener('change', () => {
-            renderAll();
-        });
-
-        document.getElementById('autoLayoutCheckbox').addEventListener('change', renderAll);
-
-        document.getElementById('prevPageBtn').addEventListener('click', () => {
-            if (activePageIdx > 0) {
-                activePageIdx--;
-                renderAll();
+            while (textEl.offsetWidth > containerWidth && currentFont > minFont) {
+                currentFont -= 0.5;
+                textEl.style.fontSize = currentFont + 'px';
             }
         });
+    }
 
-        document.getElementById('nextPageBtn').addEventListener('click', () => {
-            activePageIdx++;
-            renderAll();
+    function downloadSingleBarcodeImage(cardIdx, filename) {
+        const card = document.getElementById(`barcode-card-${cardIdx}`);
+        if (!card) return;
+
+        const dlBtn = card.querySelector('.download-single-btn');
+        if (dlBtn) dlBtn.style.display = 'none';
+
+        html2canvas(card, {
+            scale: 3,
+            backgroundColor: "#ffffff"
+        }).then(canvas => {
+            const image = canvas.toDataURL("image/png");
+            const a = document.createElement('a');
+            a.href = image;
+            a.download = `${filename || '條碼標籤'}.png`;
+            a.click();
+
+            if (dlBtn) dlBtn.style.display = 'block';
+        }).catch(err => {
+            console.error("下載圖片失敗:", err);
+            if (dlBtn) dlBtn.style.display = 'block';
         });
+    }
 
-        document.getElementById('showAllPagesCheckbox').addEventListener('change', renderAll);
+    function downloadAllBarcodeImages() {
+        const cards = document.querySelectorAll('.barcode-card');
+        if (!cards || cards.length === 0) {
+            alert('沒有可下載的條碼標籤！');
+            return;
+        }
 
-        document.getElementById('decQtyBtn').addEventListener('click', () => {
-            const input = document.getElementById('posQuantityInput');
-            let val = parseInt(input.value, 10) || 1;
-            if (val > 1) {
-                input.value = val - 1;
-                renderAll();
-            }
-        });
+        showStatus('⏳ 正在下載生成條碼圖片，請稍候...');
 
-        document.getElementById('incQtyBtn').addEventListener('click', () => {
-            const input = document.getElementById('posQuantityInput');
-            let val = parseInt(input.value, 10) || 1;
-            input.value = val + 1;
-            renderAll();
-        });
-
-        document.getElementById('scanSensitivitySelect').addEventListener('change', () => {
-            if (videoStream) {
-                stopCameraScanner();
-                startCameraScanner();
-            }
-        });
-
-        document.getElementById('typeEan13Btn').addEventListener('click', () => setBarcodeType('EAN13'));
-        document.getElementById('typeEan8Btn').addEventListener('click', () => setBarcodeType('EAN8'));
-        document.getElementById('typeCode128Btn').addEventListener('click', () => setBarcodeType('CODE128'));
-
-        document.getElementById('openCameraBtn').addEventListener('click', startCameraScanner);
-        document.getElementById('openBatchCameraBtn').addEventListener('click', startCameraScanner);
-        document.getElementById('closeCameraBtn').addEventListener('click', stopCameraScanner);
-        document.getElementById('cancelCameraBtn').addEventListener('click', stopCameraScanner);
-        document.getElementById('switchCameraBtn').addEventListener('click', switchCamera);
-
-        document.getElementById('barcodeInput').addEventListener('input', renderAll);
-        document.getElementById('posQuantityInput').addEventListener('input', renderAll);
-        document.getElementById('noteInput').addEventListener('input', renderAll);
-        document.getElementById('enableNote').addEventListener('change', renderAll);
-        document.getElementById('notePosition').addEventListener('change', renderAll);
-        document.getElementById('noteAlign').addEventListener('change', renderAll);
-        document.getElementById('autoHeightCheckbox').addEventListener('change', renderAll);
-        document.getElementById('barHeight').addEventListener('input', renderAll);
-        document.getElementById('labelCopiesInput').addEventListener('input', renderAll);
-
-        document.getElementById('randomBtn').addEventListener('click', () => {
-            document.getElementById('barcodeInput').value = `471${Math.floor(100000000 + Math.random() * 900000000)}`;
-            renderAll();
-        });
-
-        // 觸發整頁標籤列印
-        document.getElementById('printLabelsBtn').addEventListener('click', () => {
-            const checkbox = document.getElementById('showAllPagesCheckbox');
-            const wasChecked = checkbox.checked;
-            checkbox.checked = true;
-            renderAll();
-            
+        let delay = 0;
+        cards.forEach((card, idx) => {
             setTimeout(() => {
-                window.print();
-                if (!wasChecked) {
-                    checkbox.checked = false;
-                    renderAll();
-                }
-            }, 100);
+                const noteText = card.querySelector('.barcode-note-text')?.innerText || `標籤_${idx+1}`;
+                const dlBtn = card.querySelector('.download-single-btn');
+                if (dlBtn) dlBtn.style.display = 'none';
+
+                html2canvas(card, {
+                    scale: 3,
+                    backgroundColor: "#ffffff"
+                }).then(canvas => {
+                    const image = canvas.toDataURL("image/png");
+                    const a = document.createElement('a');
+                    a.href = image;
+                    a.download = `${idx+1}_${noteText}.png`;
+                    a.click();
+                    if (dlBtn) dlBtn.style.display = 'block';
+                });
+            }, delay);
+            delay += 300;
+        });
+    }
+
+    function renderLayoutGridUI() {
+        const grid = document.getElementById('barcodeGrid');
+        grid.innerHTML = '';
+
+        grid.className = `barcode-grid grid-cols-${currentLayoutColumns}`;
+
+        let printList = [];
+        itemsData.forEach((item, index) => {
+            const count = currentRepeatQty ? (item.quantity || 1) : 1;
+            for (let i = 0; i < count; i++) {
+                printList.push({
+                    originalIndex: index,
+                    note: item.note || "",
+                    barcode: item.barcode,
+                    quantity: item.quantity,
+                    copySeq: i + 1
+                });
+            }
         });
 
-        document.getElementById('downloadBatchZipBtn').addEventListener('click', downloadBatchZip);
+        document.getElementById('labelCountBadge').innerText = printList.length;
 
-        applyPaperPreset('A4');
+        let barWidth = 1.8;
+        let barHeight = 50;
+        let qrWidth = 100;
+
+        if (currentLayoutColumns === 1) {
+            barWidth = 2.0; barHeight = 60; qrWidth = 130;
+        } else if (currentLayoutColumns === 2) {
+            barWidth = 1.8; barHeight = 48; qrWidth = 100;
+        } else if (currentLayoutColumns === 3) {
+            barWidth = 1.4; barHeight = 40; qrWidth = 75;
+        } else if (currentLayoutColumns === 4) {
+            barWidth = 1.2; barHeight = 32; qrWidth = 60;
+        }
+
+        printList.forEach((labelItem, idx) => {
+            const card = document.createElement('div');
+            card.className = 'barcode-card';
+            card.id = `barcode-card-${idx}`;
+
+            let contentHTML = '';
+            const show1D = (currentBarcodeType !== 'qrcode');
+            const show2D = (currentBarcodeType === 'qrcode' || currentBarcodeType === 'both');
+
+            if (show1D && !show2D) {
+                contentHTML = `<svg id="svg-code-${idx}" class="barcode-svg"></svg>`;
+            } else if (!show1D && show2D) {
+                contentHTML = `<div class="qr-canvas-box" id="qr-box-${idx}"></div>`;
+            } else {
+                contentHTML = `
+                    <div class="barcode-content-stacked">
+                        <div class="qr-canvas-box" id="qr-box-${idx}"></div>
+                        <svg id="svg-code-${idx}" class="barcode-svg"></svg>
+                    </div>
+                `;
+            }
+
+            const cleanFileName = labelItem.note ? labelItem.note.replace(/[\\/:*?"<>|]/g, "_") : `標籤_${idx+1}`;
+
+            const noteHtmlBlock = labelItem.note ? `
+                <div class="barcode-note-container">
+                    <span class="barcode-note-text">${labelItem.note}</span>
+                </div>
+            ` : '';
+
+            card.innerHTML = `
+                ${noteHtmlBlock}
+                ${contentHTML}
+                <button class="download-single-btn no-print" onclick="downloadSingleBarcodeImage(${idx}, '${cleanFileName}')">💾 下載</button>
+            `;
+            grid.appendChild(card);
+
+            if (show1D && labelItem.barcode) {
+                const svgId = `#svg-code-${idx}`;
+                // 強制使用智慧自動偵測格式，不受頂部輸出類型按鈕影響
+                let formatToUse = getSmartBarcodeFormat(labelItem.barcode);
+
+                try {
+                    JsBarcode(svgId, labelItem.barcode, {
+                        format: formatToUse,
+                        lineColor: "#000",
+                        width: barWidth,
+                        height: show2D ? Math.max(28, barHeight - 14) : barHeight,
+                        displayValue: true,
+                        fontSize: currentLayoutColumns >= 3 ? 11 : 12,
+                        margin: 2
+                    });
+                } catch (e) {
+                    try {
+                        JsBarcode(svgId, labelItem.barcode, {
+                            format: "CODE128",
+                            lineColor: "#000",
+                            width: barWidth,
+                            height: show2D ? Math.max(28, barHeight - 14) : barHeight,
+                            displayValue: true,
+                            fontSize: currentLayoutColumns >= 3 ? 11 : 12,
+                            margin: 2
+                        });
+                    } catch (err) {
+                        console.error("Barcode Render Error:", err);
+                    }
+                }
+            }
+
+            if (show2D && labelItem.barcode) {
+                const formattedBarcode = /^\d+$/.test(labelItem.barcode) ? Number(labelItem.barcode) : labelItem.barcode;
+                
+                const itemJsonObj = {
+                    "Goods": [
+                        {
+                            "Commodity": [
+                                {
+                                    "Device": "System",
+                                    "Barcode": formattedBarcode,
+                                    "Quantity": labelItem.quantity || 1
+                                }
+                            ]
+                        }
+                    ]
+                };
+                const itemJson = JSON.stringify(itemJsonObj);
+
+                const targetQrWidth = show1D ? Math.max(50, qrWidth - 20) : qrWidth;
+
+                setTimeout(() => {
+                    const qrBox = document.getElementById(`qr-box-${idx}`);
+                    if (qrBox) {
+                        qrBox.innerHTML = "";
+                        try {
+                            new QRCode(qrBox, {
+                                text: itemJson,
+                                width: targetQrWidth,
+                                height: targetQrWidth,
+                                colorDark: "#000000",
+                                colorLight: "#ffffff",
+                                correctLevel: QRCode.CorrectLevel.M
+                            });
+                        } catch (qrErr) {
+                            console.error("QRCode Render Error:", qrErr);
+                        }
+                    }
+                }, 15);
+            }
+        });
+
+        setTimeout(adjustNoteFontSizes, 40);
+    }
+
+    function addItemRow() {
+        itemsData.push({ note: "", barcode: "", quantity: 1 });
+        selectedIndex = itemsData.length - 1;
         renderAll();
-    </script>
+    }
+
+    function removeItemRow(index) {
+        if (itemsData.length <= 1) {
+            alert('至少需保留一項商品！');
+            return;
+        }
+        itemsData.splice(index, 1);
+        if (selectedIndex >= itemsData.length) {
+            selectedIndex = Math.max(0, itemsData.length - 1);
+        }
+        renderAll();
+    }
+
+    function clearAllItems() {
+        itemsData = [{ note: "", barcode: "", quantity: 1 }];
+        selectedIndex = 0;
+        renderAll();
+    }
+
+    function syncDataToJSON() {
+        if (isUpdatingFromJson) return;
+
+        const commodityArray = itemsData.map(item => {
+            const formattedBarcode = /^\d+$/.test(item.barcode) ? Number(item.barcode) : item.barcode;
+            return {
+                "Device": "System",
+                "Barcode": formattedBarcode,
+                "Quantity": item.quantity,
+                "Note": item.note || ""
+            };
+        });
+
+        const jsonObj = {
+            "Goods": [
+                {
+                    "Commodity": commodityArray
+                }
+            ]
+        };
+
+        const jsonString = JSON.stringify(jsonObj, null, 2);
+        document.getElementById('jsonInput').value = jsonString;
+    }
+
+    function syncJSONToData() {
+        if (isUpdatingFromJson) return;
+
+        const jsonText = document.getElementById('jsonInput').value.trim();
+        try {
+            const parsed = JSON.parse(jsonText);
+            if (parsed && parsed.Goods && parsed.Goods[0] && Array.isArray(parsed.Goods[0].Commodity)) {
+                isUpdatingFromJson = true;
+                itemsData = parsed.Goods[0].Commodity.map((c, i) => ({
+                    note: c.Note || "",
+                    barcode: String(c.Barcode || ''),
+                    quantity: c.Quantity || 1
+                }));
+                if (selectedIndex >= itemsData.length) selectedIndex = 0;
+                renderItemsListUI();
+                renderLayoutGridUI();
+                isUpdatingFromJson = false;
+            }
+        } catch (e) {}
+    }
+
+    function renderAll() {
+        renderItemsListUI();
+        syncDataToJSON();
+        renderLayoutGridUI();
+    }
+
+    window.onload = function() {
+        renderAll();
+        document.getElementById('jsonInput').addEventListener('input', syncJSONToData);
+        window.addEventListener('resize', adjustNoteFontSizes);
+    };
+</script>
+
 </body>
 </html>
